@@ -4,8 +4,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import get_settings
+from app.routers import auth
 
 
 @asynccontextmanager
@@ -25,6 +27,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Session middleware (required for OAuth state parameter)
+app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -33,6 +38,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Routers
+app.include_router(auth.router)
 
 
 @app.get("/api/health")
