@@ -75,6 +75,12 @@ export function ContainerDetailPage() {
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
 
+  // Time slider state
+  const [selectedDate, setSelectedDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  )
+  const todayStr = new Date().toISOString().split('T')[0]
+
   // Support menu state
   const [supportMenu, setSupportMenu] = useState<{ x: number; y: number } | null>(null)
 
@@ -113,21 +119,42 @@ export function ContainerDetailPage() {
     }
   }, [id])
 
-  const fetchPlantings = useCallback(async () => {
+  const fetchPlantings = useCallback(async (dateFilter?: string) => {
     try {
-      const res = await fetch(`/api/plantings/by-container/${id}`)
+      const dateParam = dateFilter || selectedDate
+      const url = dateParam
+        ? `/api/plantings/by-container/${id}?as_of=${dateParam}`
+        : `/api/plantings/by-container/${id}`
+      const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to load plantings')
       setPlantings(await res.json())
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load plantings')
     }
-  }, [id])
+  }, [id, selectedDate])
 
   useEffect(() => {
     if (id) {
       Promise.all([fetchContainer(), fetchPlantings()]).finally(() => setLoading(false))
     }
   }, [id, fetchContainer, fetchPlantings])
+
+  // Refetch plantings when date changes
+  useEffect(() => {
+    if (id && !loading) {
+      fetchPlantings()
+    }
+  }, [selectedDate])
+
+  function changeDate(days: number) {
+    const d = new Date(selectedDate)
+    d.setDate(d.getDate() + days)
+    setSelectedDate(d.toISOString().split('T')[0])
+  }
+
+  function goToToday() {
+    setSelectedDate(new Date().toISOString().split('T')[0])
+  }
 
   async function fetchVarietiesAndCategories() {
     try {
@@ -188,20 +215,18 @@ export function ContainerDetailPage() {
   }
 
   function getPlantingAt(x: number, y: number): PlantingData | undefined {
-    const today = new Date().toISOString().split('T')[0]
+    // Backend already filters by as_of date; just match position
     return plantings.find((p: PlantingData) => {
       const inX = x >= p.square_x && x < p.square_x + p.square_width
       const inY = y >= p.square_y && y < p.square_y + p.square_height
-      const active = p.start_date <= today && p.end_date > today
-      return inX && inY && active
+      return inX && inY
     })
   }
 
   function getPlantingAtLevel(level: number, pocket: number): PlantingData | undefined {
-    const today = new Date().toISOString().split('T')[0]
+    // Backend already filters by as_of date; just match position
     return plantings.find((p: PlantingData) => {
-      return p.tower_level === level && p.square_x === pocket &&
-        p.start_date <= today && p.end_date > today
+      return p.tower_level === level && p.square_x === pocket
     })
   }
 
@@ -375,10 +400,32 @@ export function ContainerDetailPage() {
           </div>
         )}
         <div className="container-info-item">
-          <div className="info-label">Active Plantings</div>
-          <div className="info-value">{plantings.filter((p: PlantingData) => p.status !== 'complete').length}</div>
+          <div className="info-label">Plantings Shown</div>
+          <div className="info-value">{plantings.length}</div>
         </div>
       </div>
+
+      {/* Time Slider / Date Picker */}
+      <div className="time-slider">
+        <button className="time-slider-btn" onClick={() => changeDate(-7)} title="Back 1 week">⏪</button>
+        <button className="time-slider-btn" onClick={() => changeDate(-1)} title="Previous day">◀</button>
+        <input
+          type="date"
+          className="time-slider-date"
+          value={selectedDate}
+          onChange={e => setSelectedDate(e.target.value)}
+        />
+        <button className="time-slider-btn" onClick={() => changeDate(1)} title="Next day">▶</button>
+        <button className="time-slider-btn" onClick={() => changeDate(7)} title="Forward 1 week">⏩</button>
+        {selectedDate !== todayStr && (
+          <button className="time-slider-today" onClick={goToToday}>Today</button>
+        )}
+      </div>
+      {selectedDate !== todayStr && (
+        <div className={`time-slider-label ${selectedDate < todayStr ? 'past' : 'future'}`}>
+          {selectedDate < todayStr ? '📜 Viewing historical state' : '🔮 Viewing planned future'}
+        </div>
+      )}
 
       {/* Grid Bed View */}
       {container.type === 'grid_bed' && (
