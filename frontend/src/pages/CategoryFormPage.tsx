@@ -1,3 +1,4 @@
+import { apiFetch } from "../lib/api"
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 
@@ -64,7 +65,7 @@ export function CategoryFormPage() {
 
   async function fetchCategory() {
     try {
-      const res = await fetch(`/api/categories/${id}`)
+      const res = await apiFetch(`/api/categories/${id}`)
       if (!res.ok) throw new Error('Category not found')
       const data = await res.json()
       setForm({
@@ -106,7 +107,7 @@ export function CategoryFormPage() {
       const url = isEdit ? `/api/categories/${id}` : '/api/categories'
       const method = isEdit ? 'PUT' : 'POST'
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

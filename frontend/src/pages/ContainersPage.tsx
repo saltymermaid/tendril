@@ -1,3 +1,4 @@
+import { apiFetch } from "../lib/api"
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -24,7 +25,7 @@ export function ContainersPage() {
 
   async function fetchContainers() {
     try {
-      const res = await fetch('/api/containers')
+      const res = await apiFetch('/api/containers')
       if (!res.ok) throw new Error('Failed to load containers')
       setContainers(await res.json())
     } catch (err: unknown) {

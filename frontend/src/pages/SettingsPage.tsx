@@ -1,3 +1,4 @@
+import { apiFetch } from "../lib/api"
 import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -35,7 +36,7 @@ export function SettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch('/api/settings', { credentials: 'include' })
+      const res = await apiFetch('/api/settings', { credentials: 'include' })
       if (res.ok) {
         const data: Settings = await res.json()
         setSettings(data)
@@ -66,7 +67,7 @@ export function SettingsPage() {
     if (claudeApiKey) body.claude_api_key = claudeApiKey
 
     try {
-      const res = await fetch('/api/settings', {
+      const res = await apiFetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

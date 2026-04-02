@@ -1,3 +1,4 @@
+import { apiFetch } from "../lib/api"
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -21,7 +22,7 @@ export function CatalogPage() {
 
   async function fetchCategories() {
     try {
-      const res = await fetch('/api/categories')
+      const res = await apiFetch('/api/categories')
       if (!res.ok) throw new Error('Failed to load categories')
       const data = await res.json()
       setCategories(data)

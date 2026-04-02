@@ -1,3 +1,4 @@
+import { apiFetch } from "../lib/api"
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -127,7 +128,7 @@ export function TasksPage() {
       if (filter !== 'all') {
         params.set('status', filter)
       }
-      const res = await fetch(`/api/tasks?${params}`)
+      const res = await apiFetch(`/api/tasks?${params}`)
       if (res.ok) {
         const data = await res.json()
         setTasks(data)
@@ -141,7 +142,7 @@ export function TasksPage() {
 
   const fetchContainers = useCallback(async () => {
     try {
-      const res = await fetch('/api/containers')
+      const res = await apiFetch('/api/containers')
       if (res.ok) {
         const data = await res.json()
         setContainers(data)
@@ -162,7 +163,7 @@ export function TasksPage() {
   async function handleGenerate() {
     setGenerating(true)
     try {
-      const res = await fetch('/api/tasks/generate')
+      const res = await apiFetch('/api/tasks/generate')
       if (res.ok) {
         const data = await res.json()
         if (data.generated > 0) {
@@ -178,7 +179,7 @@ export function TasksPage() {
 
   async function handleStatusChange(taskId: number, newStatus: string) {
     try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
+      const res = await apiFetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -196,7 +197,7 @@ export function TasksPage() {
   async function handleDelete(taskId: number) {
     if (!confirm('Delete this task?')) return
     try {
-      const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
       if (res.ok) {
         setTasks((prev) => prev.filter((t) => t.id !== taskId))
       }
@@ -216,7 +217,7 @@ export function TasksPage() {
       if (form.container_id) body.container_id = parseInt(form.container_id)
       if (form.planting_id) body.planting_id = parseInt(form.planting_id)
 
-      const res = await fetch('/api/tasks', {
+      const res = await apiFetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

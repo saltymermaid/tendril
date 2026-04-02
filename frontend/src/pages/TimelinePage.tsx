@@ -1,3 +1,4 @@
+import { apiFetch } from "../lib/api"
 import { useEffect, useState, useCallback } from 'react'
 import { GanttChart, TimelinePlanting } from '../components/GanttChart'
 
@@ -42,7 +43,7 @@ export function TimelinePage() {
 
   const fetchContainers = useCallback(async () => {
     try {
-      const res = await fetch('/api/containers', { credentials: 'include' })
+      const res = await apiFetch('/api/containers', { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
         setContainers(data.map((c: { id: number; name: string }) => ({ id: c.id, name: c.name })))
@@ -60,7 +61,7 @@ export function TimelinePage() {
       if (containerId !== null) {
         url += `&container_id=${containerId}`
       }
-      const res = await fetch(url, { credentials: 'include' })
+      const res = await apiFetch(url, { credentials: 'include' })
       if (!res.ok) throw new Error('Failed to load timeline')
       const data = await res.json()
       setPlantings(data.plantings)

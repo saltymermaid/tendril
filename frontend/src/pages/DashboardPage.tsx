@@ -1,3 +1,4 @@
+import { apiFetch } from "../lib/api"
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
@@ -49,8 +50,8 @@ export function DashboardPage() {
   const fetchData = useCallback(async () => {
     try {
       const [tasksRes, containersRes] = await Promise.all([
-        fetch('/api/tasks?status=pending'),
-        fetch('/api/containers/overview'),
+        apiFetch('/api/tasks?status=pending'),
+        apiFetch('/api/containers/overview'),
       ])
       if (tasksRes.ok) {
         const tasksData = await tasksRes.json()
@@ -73,7 +74,7 @@ export function DashboardPage() {
 
   async function handleCompleteTask(taskId: number) {
     try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
+      const res = await apiFetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'completed' }),

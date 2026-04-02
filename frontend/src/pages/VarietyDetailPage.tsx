@@ -1,3 +1,4 @@
+import { apiFetch } from "../lib/api"
 import { useEffect, useState, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 
@@ -91,14 +92,14 @@ export function VarietyDetailPage() {
 
   const fetchEvents = useCallback(async () => {
     try {
-      const res = await fetch(`/api/events?variety_id=${id}`)
+      const res = await apiFetch(`/api/events?variety_id=${id}`)
       if (res.ok) setEvents(await res.json())
     } catch { /* ignore */ }
   }, [id])
 
   const fetchNotes = useCallback(async () => {
     try {
-      const res = await fetch(`/api/notes?variety_id=${id}`)
+      const res = await apiFetch(`/api/notes?variety_id=${id}`)
       if (res.ok) setNotes(await res.json())
     } catch { /* ignore */ }
   }, [id])
@@ -112,7 +113,7 @@ export function VarietyDetailPage() {
 
   async function fetchVariety() {
     try {
-      const res = await fetch(`/api/varieties/${id}`)
+      const res = await apiFetch(`/api/varieties/${id}`)
       if (!res.ok) throw new Error('Variety not found')
       setVariety(await res.json())
     } catch (err: unknown) {
@@ -126,7 +127,7 @@ export function VarietyDetailPage() {
     if (!confirm('Delete this variety? This cannot be undone.')) return
     setDeleting(true)
     try {
-      const res = await fetch(`/api/varieties/${id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/varieties/${id}`, { method: 'DELETE' })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.detail || 'Failed to delete')
@@ -144,7 +145,7 @@ export function VarietyDetailPage() {
     setActionLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/notes', {
+      const res = await apiFetch('/api/notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -171,7 +172,7 @@ export function VarietyDetailPage() {
   async function handleDeleteNote(noteId: number) {
     if (!confirm('Delete this note?')) return
     try {
-      const res = await fetch(`/api/notes/${noteId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/notes/${noteId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete note')
       fetchNotes()
     } catch (err: unknown) {

@@ -1,3 +1,4 @@
+import { apiFetch } from "../lib/api"
 import { useEffect, useState, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 
@@ -148,7 +149,7 @@ export function ContainerDetailPage() {
 
   const fetchContainer = useCallback(async () => {
     try {
-      const res = await fetch(`/api/containers/${id}`)
+      const res = await apiFetch(`/api/containers/${id}`)
       if (!res.ok) throw new Error('Container not found')
       setContainer(await res.json())
     } catch (err: unknown) {
@@ -162,7 +163,7 @@ export function ContainerDetailPage() {
       const url = dateParam
         ? `/api/plantings/by-container/${id}?as_of=${dateParam}`
         : `/api/plantings/by-container/${id}`
-      const res = await fetch(url)
+      const res = await apiFetch(url)
       if (!res.ok) throw new Error('Failed to load plantings')
       setPlantings(await res.json())
     } catch (err: unknown) {
@@ -196,8 +197,8 @@ export function ContainerDetailPage() {
   async function fetchVarietiesAndCategories() {
     try {
       const [varRes, catRes] = await Promise.all([
-        fetch('/api/varieties'),
-        fetch('/api/categories'),
+        apiFetch('/api/varieties'),
+        apiFetch('/api/categories'),
       ])
       if (varRes.ok) setVarieties(await varRes.json())
       if (catRes.ok) setCategories(await catRes.json())
@@ -210,7 +211,7 @@ export function ContainerDetailPage() {
     if (!confirm('Delete this container? This cannot be undone.')) return
     setDeleting(true)
     try {
-      const res = await fetch(`/api/containers/${id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/containers/${id}`, { method: 'DELETE' })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.detail || 'Failed to delete')
@@ -224,7 +225,7 @@ export function ContainerDetailPage() {
 
   async function setSupport(x: number, y: number, supportType: string) {
     try {
-      const res = await fetch(`/api/containers/${id}/squares/${x}/${y}/support`, {
+      const res = await apiFetch(`/api/containers/${id}/squares/${x}/${y}/support`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ support_type: supportType }),
@@ -239,7 +240,7 @@ export function ContainerDetailPage() {
 
   async function removeSupport(x: number, y: number) {
     try {
-      await fetch(`/api/containers/${id}/squares/${x}/${y}/support`, { method: 'DELETE' })
+      await apiFetch(`/api/containers/${id}/squares/${x}/${y}/support`, { method: 'DELETE' })
       setSupportMenu(null)
       fetchContainer()
     } catch {
@@ -317,7 +318,7 @@ export function ContainerDetailPage() {
         body.quantity = Number(plantingForm.quantity)
       }
 
-      const res = await fetch('/api/plantings', {
+      const res = await apiFetch('/api/plantings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -350,7 +351,7 @@ export function ContainerDetailPage() {
     setRecommendations(null)
     setExpandedCategories(new Set())
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/recommendations?container_id=${id}&square_x=${x}&square_y=${y}&date=${selectedDate}`
       )
       if (!res.ok) throw new Error('Failed to load recommendations')

@@ -1,3 +1,4 @@
+import { apiFetch } from "../lib/api"
 import { useEffect, useState, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 
@@ -119,14 +120,14 @@ export function PlantingDetailPage() {
 
   const fetchEvents = useCallback(async () => {
     try {
-      const res = await fetch(`/api/events?planting_id=${id}`)
+      const res = await apiFetch(`/api/events?planting_id=${id}`)
       if (res.ok) setEvents(await res.json())
     } catch { /* ignore */ }
   }, [id])
 
   const fetchNotes = useCallback(async () => {
     try {
-      const res = await fetch(`/api/notes?planting_id=${id}`)
+      const res = await apiFetch(`/api/notes?planting_id=${id}`)
       if (res.ok) setNotes(await res.json())
     } catch { /* ignore */ }
   }, [id])
@@ -140,7 +141,7 @@ export function PlantingDetailPage() {
 
   async function fetchPlanting() {
     try {
-      const res = await fetch(`/api/plantings/${id}`)
+      const res = await apiFetch(`/api/plantings/${id}`)
       if (!res.ok) throw new Error('Planting not found')
       setPlanting(await res.json())
     } catch (err: unknown) {
@@ -153,7 +154,7 @@ export function PlantingDetailPage() {
   async function handleDelete() {
     if (!confirm('Delete this planting?')) return
     try {
-      const res = await fetch(`/api/plantings/${id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/plantings/${id}`, { method: 'DELETE' })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.detail || 'Failed to delete')
@@ -168,7 +169,7 @@ export function PlantingDetailPage() {
     setActionLoading(true)
     setError('')
     try {
-      const res = await fetch(`/api/plantings/${id}/activate`, {
+      const res = await apiFetch(`/api/plantings/${id}/activate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -194,7 +195,7 @@ export function PlantingDetailPage() {
     setActionLoading(true)
     setError('')
     try {
-      const res = await fetch(`/api/plantings/${id}/complete`, {
+      const res = await apiFetch(`/api/plantings/${id}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ removal_reason: removalReason }),
@@ -219,7 +220,7 @@ export function PlantingDetailPage() {
     setActionLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/events', {
+      const res = await apiFetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -259,7 +260,7 @@ export function PlantingDetailPage() {
     setActionLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/notes', {
+      const res = await apiFetch('/api/notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -291,7 +292,7 @@ export function PlantingDetailPage() {
   async function handleDeleteNote(noteId: number) {
     if (!confirm('Delete this note?')) return
     try {
-      const res = await fetch(`/api/notes/${noteId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/notes/${noteId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete note')
       fetchNotes()
     } catch (err: unknown) {
@@ -302,7 +303,7 @@ export function PlantingDetailPage() {
   async function handleDeleteEvent(eventId: number) {
     if (!confirm('Delete this event?')) return
     try {
-      const res = await fetch(`/api/events/${eventId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/events/${eventId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete event')
       fetchEvents()
     } catch (err: unknown) {

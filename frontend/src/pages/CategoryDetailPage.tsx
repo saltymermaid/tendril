@@ -1,3 +1,4 @@
+import { apiFetch } from "../lib/api"
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 
@@ -70,8 +71,8 @@ export function CategoryDetailPage() {
   async function fetchData() {
     try {
       const [catRes, varRes] = await Promise.all([
-        fetch(`/api/categories/${id}`),
-        fetch(`/api/varieties?category_id=${id}`),
+        apiFetch(`/api/categories/${id}`),
+        apiFetch(`/api/varieties?category_id=${id}`),
       ])
 
       if (!catRes.ok) throw new Error('Category not found')

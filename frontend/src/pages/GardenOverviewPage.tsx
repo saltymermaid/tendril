@@ -1,3 +1,4 @@
+import { apiFetch } from "../lib/api"
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -41,7 +42,7 @@ export function GardenOverviewPage() {
 
   const fetchOverview = useCallback(async () => {
     try {
-      const res = await fetch(`/api/containers/overview?date=${selectedDate}`)
+      const res = await apiFetch(`/api/containers/overview?date=${selectedDate}`)
       if (!res.ok) throw new Error('Failed to load overview')
       setContainers(await res.json())
     } catch (err: unknown) {

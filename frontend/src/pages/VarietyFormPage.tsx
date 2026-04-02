@@ -1,3 +1,4 @@
+import { apiFetch } from "../lib/api"
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 
@@ -138,20 +139,20 @@ export function VarietyFormPage() {
   async function loadData() {
     try {
       // Always load categories for the dropdown
-      const catRes = await fetch('/api/categories')
+      const catRes = await apiFetch('/api/categories')
       if (catRes.ok) {
         setCategories(await catRes.json())
       }
 
       // Check if user has Claude API key
-      const settingsRes = await fetch('/api/settings', { credentials: 'include' })
+      const settingsRes = await apiFetch('/api/settings', { credentials: 'include' })
       if (settingsRes.ok) {
         const settings = await settingsRes.json()
         setHasApiKey(settings.has_claude_api_key)
       }
 
       if (isEdit && id) {
-        const res = await fetch(`/api/varieties/${id}`)
+        const res = await apiFetch(`/api/varieties/${id}`)
         if (!res.ok) throw new Error('Variety not found')
         const data = await res.json()
         setForm({
@@ -208,7 +209,7 @@ export function VarietyFormPage() {
       const { base64, mediaType } = await compressImage(file)
 
       // Send to AI extraction endpoint
-      const res = await fetch('/api/varieties/extract-from-photo', {
+      const res = await apiFetch('/api/varieties/extract-from-photo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -285,7 +286,7 @@ export function VarietyFormPage() {
       const url = isEdit ? `/api/varieties/${id}` : '/api/varieties'
       const method = isEdit ? 'PUT' : 'POST'
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
