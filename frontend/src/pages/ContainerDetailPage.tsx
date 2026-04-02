@@ -138,6 +138,7 @@ export function ContainerDetailPage() {
 
   // Selected planting for detail view
   const [selectedPlanting, setSelectedPlanting] = useState<PlantingData | null>(null)
+  const [activating, setActivating] = useState(false)
 
   // Recommendation state
   const [recommendations, setRecommendations] = useState<RecommendationData | null>(null)
@@ -270,6 +271,19 @@ export function ContainerDetailPage() {
 
   function isPlantingOrigin(p: PlantingData, x: number, y: number): boolean {
     return p.square_x === x && p.square_y === y
+  }
+
+  async function handleActivatePlanting(plantingId: number) {
+    setActivating(true)
+    try {
+      const res = await apiFetch(`/api/plantings/${plantingId}/activate`, { method: 'POST' })
+      if (res.ok) {
+        setSelectedPlanting(null)
+        fetchPlantings(selectedDate)
+      }
+    } finally {
+      setActivating(false)
+    }
   }
 
   function openPlantingModal(x: number, y: number, towerLevel?: number) {
@@ -898,8 +912,38 @@ export function ContainerDetailPage() {
               >
                 View Details
               </Link>
-              <button className="btn btn-primary" onClick={() => setSelectedPlanting(null)}>
-                Close
+              {selectedPlanting.status === 'not_started' && (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => handleActivatePlanting(selectedPlanting.id)}
+                  disabled={activating}
+                >
+                  {activating ? '…' : '🌱 Plant Now'}
+                </button>
+              )}
+              {selectedPlanting.status === 'in_progress' && (
+                <Link
+                  to={`/plantings/${selectedPlanting.id}`}
+                  className="btn btn-primary"
+                  onClick={() => setSelectedPlanting(null)}
+                >
+                  🌾 Log Harvest
+                </Link>
+              )}
+              <button
+                className="btn btn-outline"
+                title="Plan a successor crop for this square"
+                onClick={() => {
+                  const p = selectedPlanting
+                  setSelectedPlanting(null)
+                  setSquareChooser({
+                    x: p.square_x,
+                    y: p.square_y ?? 0,
+                    towerLevel: p.tower_level ?? undefined,
+                  })
+                }}
+              >
+                ➕ Plan Next
               </button>
             </div>
           </div>
