@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 
 interface Category {
@@ -64,6 +64,53 @@ const MONTHS = [
   { value: 12, label: 'December' },
 ]
 
+/**
+ * Compress an image file to JPEG with max dimension and quality settings.
+ * Returns { base64, mediaType } where base64 has no data: prefix.
+ */
+async function compressImage(
+  file: File,
+  maxWidth = 1200,
+  quality = 0.8,
+): Promise<{ base64: string; mediaType: string }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+
+      let { width, height } = img
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width)
+        width = maxWidth
+      }
+
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'))
+        return
+      }
+      ctx.drawImage(img, 0, 0, width, height)
+
+      const dataUrl = canvas.toDataURL('image/jpeg', quality)
+      // Strip the data:image/jpeg;base64, prefix
+      const base64 = dataUrl.split(',')[1]
+      resolve({ base64, mediaType: 'image/jpeg' })
+    }
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Failed to load image'))
+    }
+
+    img.src = url
+  })
+}
+
 export function VarietyFormPage() {
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
@@ -76,6 +123,14 @@ export function VarietyFormPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // AI extraction state
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [extracting, setExtracting] = useState(false)
+  const [extractError, setExtractError] = useState('')
+  const [extractSuccess, setExtractSuccess] = useState('')
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [hasApiKey, setHasApiKey] = useState(false)
+
   useEffect(() => {
     loadData()
   }, [id])
@@ -86,6 +141,13 @@ export function VarietyFormPage() {
       const catRes = await fetch('/api/categories')
       if (catRes.ok) {
         setCategories(await catRes.json())
+      }
+
+      // Check if user has Claude API key
+      const settingsRes = await fetch('/api/settings', { credentials: 'include' })
+      if (settingsRes.ok) {
+        const settings = await settingsRes.json()
+        setHasApiKey(settings.has_claude_api_key)
       }
 
       if (isEdit && id) {
@@ -112,6 +174,9 @@ export function VarietyFormPage() {
           source_url: data.source_url || '',
           notes: data.notes || '',
         })
+        if (data.seed_packet_photo_url) {
+          setPreviewUrl(data.seed_packet_photo_url)
+        }
       } else {
         // Pre-select category from URL param
         const catParam = searchParams.get('category')
@@ -123,6 +188,70 @@ export function VarietyFormPage() {
       setError(err instanceof Error ? err.message : 'Failed to load data')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handlePhotoCapture(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setExtractError('')
+    setExtractSuccess('')
+
+    // Show preview immediately
+    const objectUrl = URL.createObjectURL(file)
+    setPreviewUrl(objectUrl)
+
+    // Compress the image
+    setExtracting(true)
+    try {
+      const { base64, mediaType } = await compressImage(file)
+
+      // Send to AI extraction endpoint
+      const res = await fetch('/api/varieties/extract-from-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ image_base64: base64, media_type: mediaType }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Extraction failed' }))
+        throw new Error(err.detail || 'Extraction failed')
+      }
+
+      const result = await res.json()
+
+      if (result.success && result.data) {
+        // Auto-populate form fields with extracted data
+        const d = result.data
+        setForm((prev) => ({
+          ...prev,
+          name: d.name || prev.name,
+          days_to_germination_min: d.days_to_germination_min ?? prev.days_to_germination_min,
+          days_to_germination_max: d.days_to_germination_max ?? prev.days_to_germination_max,
+          days_to_harvest_min: d.days_to_harvest_min ?? prev.days_to_harvest_min,
+          days_to_harvest_max: d.days_to_harvest_max ?? prev.days_to_harvest_max,
+          planting_depth: d.planting_depth || prev.planting_depth,
+          spacing: d.spacing || prev.spacing,
+          sunlight: d.sunlight || prev.sunlight,
+          is_climbing: d.is_climbing ?? prev.is_climbing,
+          planting_method: d.planting_method || prev.planting_method,
+          notes: d.notes ? (prev.notes ? prev.notes + '\n\n' + d.notes : d.notes) : prev.notes,
+        }))
+
+        const fieldCount = Object.values(d).filter((v) => v !== null && v !== undefined).length
+        setExtractSuccess(`Extracted ${fieldCount} fields from seed packet. Review and adjust as needed.`)
+        setTimeout(() => setExtractSuccess(''), 5000)
+      } else {
+        setExtractError(result.error || 'Could not extract data from photo.')
+      }
+    } catch (err: unknown) {
+      setExtractError(err instanceof Error ? err.message : 'Photo extraction failed')
+    } finally {
+      setExtracting(false)
+      // Reset file input so the same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -203,6 +332,101 @@ export function VarietyFormPage() {
       </div>
 
       {error && <div className="form-message error">{error}</div>}
+
+      {/* Seed Packet Photo Import */}
+      <div className="form-card photo-import-card">
+        <h3>📸 Seed Packet Photo Import</h3>
+        <p className="form-help" style={{ marginBottom: 'var(--space-3)' }}>
+          Take a photo of a seed packet to auto-fill growing data using AI.
+        </p>
+
+        {!hasApiKey && (
+          <div className="form-message" style={{ marginBottom: 'var(--space-3)', background: 'var(--warning-bg, #fff3cd)', color: 'var(--warning-text, #856404)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)' }}>
+            ⚠️ No Claude API key configured.{' '}
+            <Link to="/settings" style={{ color: 'inherit', fontWeight: 600 }}>Add one in Settings</Link>{' '}
+            to enable AI extraction.
+          </div>
+        )}
+
+        <div className="photo-import-controls">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handlePhotoCapture}
+            style={{ display: 'none' }}
+            id="seed-packet-photo"
+          />
+
+          <div className="photo-import-buttons">
+            <button
+              type="button"
+              className="btn btn-outline-dark"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={extracting || !hasApiKey}
+            >
+              {extracting ? '🔄 Analyzing...' : '📷 Capture Seed Packet'}
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-outline-dark"
+              onClick={() => {
+                // Remove capture attribute for gallery selection
+                if (fileInputRef.current) {
+                  fileInputRef.current.removeAttribute('capture')
+                  fileInputRef.current.click()
+                  // Restore capture attribute after
+                  setTimeout(() => {
+                    if (fileInputRef.current) {
+                      fileInputRef.current.setAttribute('capture', 'environment')
+                    }
+                  }, 100)
+                }
+              }}
+              disabled={extracting || !hasApiKey}
+            >
+              🖼️ Choose from Gallery
+            </button>
+          </div>
+
+          {extracting && (
+            <div className="extract-loading">
+              <div className="extract-spinner"></div>
+              <span>Analyzing seed packet with AI...</span>
+            </div>
+          )}
+
+          {extractError && (
+            <div className="form-message error" style={{ marginTop: 'var(--space-3)' }}>
+              {extractError}
+            </div>
+          )}
+
+          {extractSuccess && (
+            <div className="form-message success" style={{ marginTop: 'var(--space-3)' }}>
+              ✅ {extractSuccess}
+            </div>
+          )}
+
+          {previewUrl && (
+            <div className="photo-preview" style={{ marginTop: 'var(--space-3)' }}>
+              <img
+                src={previewUrl}
+                alt="Seed packet"
+                style={{
+                  maxWidth: '200px',
+                  maxHeight: '200px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border)',
+                  objectFit: 'cover',
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} className="detail-form">
         {/* Basic Info */}
@@ -442,7 +666,7 @@ export function VarietyFormPage() {
               onChange={(e) => updateField('seed_packet_photo_url', e.target.value)}
               placeholder="https://..."
             />
-            <p className="form-help">You can also upload seed packet photos later via the AI import feature.</p>
+            <p className="form-help">Direct URL to a seed packet image (optional).</p>
           </div>
         </div>
 

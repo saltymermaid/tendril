@@ -1,6 +1,7 @@
 """Variety CRUD router — per-user plant varieties."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -12,8 +13,22 @@ from app.models.planting import Planting
 from app.models.user import User
 from app.models.variety import Variety
 from app.schemas.variety import VarietyCreate, VarietyResponse, VarietyUpdate
+from app.services.seed_packet_ai import extract_seed_packet_data
 
 router = APIRouter(prefix="/api/varieties", tags=["varieties"])
+
+
+# --- Schemas for photo extraction ---
+
+class PhotoExtractRequest(BaseModel):
+    image_base64: str
+    media_type: str = "image/jpeg"
+
+
+class PhotoExtractResponse(BaseModel):
+    success: bool
+    data: dict | None = None
+    error: str | None = None
 
 
 def _variety_to_response(variety: Variety) -> VarietyResponse:
@@ -65,6 +80,54 @@ async def list_varieties(
     varieties = result.scalars().all()
 
     return [_variety_to_response(v) for v in varieties]
+
+
+@router.post("/extract-from-photo", response_model=PhotoExtractResponse)
+async def extract_from_photo(
+    body: PhotoExtractRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Extract seed packet data from a photo using Claude AI.
+
+    Requires the user to have a Claude API key configured in settings.
+    Accepts base64-encoded image data and returns extracted variety fields.
+    """
+    settings = current_user.settings or {}
+    api_key = settings.get("claude_api_key")
+
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No Claude API key configured. Please add one in Settings.",
+        )
+
+    # Validate media type
+    allowed_types = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+    if body.media_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported image type: {body.media_type}. Use JPEG, PNG, GIF, or WebP.",
+        )
+
+    # Validate base64 data isn't too large (roughly 10MB limit)
+    if len(body.image_base64) > 14_000_000:  # ~10MB in base64
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Image too large. Please compress the image before uploading.",
+        )
+
+    result = await extract_seed_packet_data(
+        image_base64=body.image_base64,
+        media_type=body.media_type,
+        api_key=api_key,
+    )
+
+    return PhotoExtractResponse(
+        success=result.success,
+        data=result.data,
+        error=result.error,
+    )
 
 
 @router.get("/{variety_id}", response_model=VarietyResponse)
