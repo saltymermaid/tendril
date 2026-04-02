@@ -1242,6 +1242,17 @@ select.form-input {
   max-width: 70px;
 }
 
+.day-select {
+  max-width: 72px;
+}
+
+.date-preview {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
 .season-remove {
   margin-bottom: var(--space-5);
 }

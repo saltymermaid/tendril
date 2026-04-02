@@ -41,6 +41,13 @@ const MONTHS = [
   { value: 12, label: 'December' },
 ]
 
+const DAYS = Array.from({ length: 31 }, (_, i) => i + 1)
+
+function formatSeasonDate(month: number, day: number): string {
+  const monthName = MONTHS.find((m) => m.value === month)?.label ?? ''
+  return `${monthName} ${day}`
+}
+
 export function CategoryFormPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -292,18 +299,17 @@ export function CategoryFormPage() {
                       <option key={m.value} value={m.value}>{m.label}</option>
                     ))}
                   </select>
-                  <input
-                    type="number"
-                    className="input day-input"
+                  <select
+                    className="input day-select"
                     value={season.start_day}
-                    onChange={(e) => updateSeason(idx, 'start_day', parseInt(e.target.value) || 1)}
-                    min={1}
-                    max={31}
-                    autoComplete="off"
-                    data-1p-ignore
-                    data-lpignore="true"
-                  />
+                    onChange={(e) => updateSeason(idx, 'start_day', parseInt(e.target.value))}
+                  >
+                    {DAYS.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
                 </div>
+                <span className="date-preview">{formatSeasonDate(season.start_month, season.start_day)}</span>
               </div>
               <div className="form-group">
                 <label className="form-label">End</label>
@@ -317,18 +323,17 @@ export function CategoryFormPage() {
                       <option key={m.value} value={m.value}>{m.label}</option>
                     ))}
                   </select>
-                  <input
-                    type="number"
-                    className="input day-input"
+                  <select
+                    className="input day-select"
                     value={season.end_day}
-                    onChange={(e) => updateSeason(idx, 'end_day', parseInt(e.target.value) || 1)}
-                    min={1}
-                    max={31}
-                    autoComplete="off"
-                    data-1p-ignore
-                    data-lpignore="true"
-                  />
+                    onChange={(e) => updateSeason(idx, 'end_day', parseInt(e.target.value))}
+                  >
+                    {DAYS.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
                 </div>
+                <span className="date-preview">{formatSeasonDate(season.end_month, season.end_day)}</span>
               </div>
               {form.planting_seasons.length > 1 && (
                 <button
