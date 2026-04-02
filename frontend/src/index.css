@@ -2706,3 +2706,219 @@ select.input {
 .seed-packet-photo img:hover {
   transform: scale(1.02);
 }
+
+/* ===== Task System ===== */
+
+.task-filters {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+  border-bottom: 2px solid var(--color-border);
+  padding-bottom: var(--space-2);
+}
+
+.task-filter-btn {
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.task-filter-btn:hover {
+  color: var(--color-text);
+}
+
+.task-filter-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.task-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.task-group-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.task-group-count {
+  background: var(--color-gray-200);
+  color: var(--color-gray-600);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.task-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.task-card:hover {
+  border-color: var(--color-gray-300);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.task-card.task-overdue {
+  border-left: 3px solid var(--color-error);
+  background: #fef2f2;
+}
+
+.task-card.task-today {
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-green-50);
+}
+
+.task-card.task-done {
+  opacity: 0.6;
+  background: var(--color-gray-50);
+}
+
+.task-card.task-done .task-title {
+  text-decoration: line-through;
+}
+
+.task-card-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.task-source-badge {
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.task-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.task-description {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  margin: var(--space-1) 0 0 0;
+  line-height: 1.4;
+}
+
+.task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+.task-due {
+  color: var(--color-text-secondary);
+}
+
+.task-overdue .task-due {
+  color: var(--color-error);
+  font-weight: 600;
+}
+
+.task-link {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.task-link:hover {
+  text-decoration: underline;
+}
+
+.task-variety {
+  color: var(--color-text-secondary);
+}
+
+.task-card-actions {
+  display: flex;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  align-items: flex-start;
+}
+
+.task-card-actions .btn {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  min-width: 32px;
+}
+
+.btn-success {
+  background: var(--color-success);
+  color: white;
+  border: 1px solid var(--color-success);
+}
+
+.btn-success:hover {
+  background: var(--color-green-700);
+  border-color: var(--color-green-700);
+}
+
+.btn-danger {
+  background: transparent;
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+}
+
+.btn-danger:hover {
+  background: var(--color-error);
+  color: white;
+}
+
+.text-error {
+  color: var(--color-error);
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.page-subtitle {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  margin-top: var(--space-1);
+}
+
+.page-actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}

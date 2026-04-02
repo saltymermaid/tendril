@@ -15,6 +15,7 @@ from app.routers.notes import router as notes_router
 from app.routers.plantings import router as plantings_router
 from app.routers.recommendations import router as recommendations_router
 from app.routers.settings import router as settings_router
+from app.routers.tasks import router as tasks_router
 from app.routers.varieties import router as varieties_router
 
 
@@ -56,6 +57,7 @@ app.include_router(notes_router)
 app.include_router(plantings_router)
 app.include_router(recommendations_router)
 app.include_router(settings_router)
+app.include_router(tasks_router)
 app.include_router(varieties_router)
 
 

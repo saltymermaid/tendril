@@ -17,6 +17,7 @@ export function AppLayout() {
           <NavLink to="/timeline" className="nav-link">Timeline</NavLink>
           <NavLink to="/catalog" className="nav-link">Catalog</NavLink>
           <NavLink to="/containers" className="nav-link">Containers</NavLink>
+          <NavLink to="/tasks" className="nav-link">Tasks</NavLink>
           <NavLink to="/settings" className="nav-link">Settings</NavLink>
         </nav>
         <div className="header-right">
