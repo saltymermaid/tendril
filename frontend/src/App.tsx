@@ -13,6 +13,7 @@ import { VarietyFormPage } from '@/pages/VarietyFormPage'
 import { ContainersPage } from '@/pages/ContainersPage'
 import { ContainerDetailPage } from '@/pages/ContainerDetailPage'
 import { ContainerFormPage } from '@/pages/ContainerFormPage'
+import { PlantingDetailPage } from '@/pages/PlantingDetailPage'
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
             <Route path="/containers/new" element={<ContainerFormPage />} />
             <Route path="/containers/:id" element={<ContainerDetailPage />} />
             <Route path="/containers/:id/edit" element={<ContainerFormPage />} />
+            <Route path="/plantings/:id" element={<PlantingDetailPage />} />
           </Route>
         </Routes>
       </AuthProvider>

@@ -1402,6 +1402,380 @@ select.input {
   color: var(--color-text-secondary);
 }
 
+/* ── Planting Styles ── */
+
+/* Grid square states */
+.grid-square.planted {
+  border-style: solid;
+  border-width: 2px;
+}
+
+.grid-square.not-started {
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+.grid-square.in-progress {
+  border-style: solid;
+}
+
+.grid-square.complete {
+  opacity: 0.5;
+}
+
+.grid-square .square-variety-name {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 100%;
+  line-height: 1.1;
+}
+
+/* Tower pocket states */
+.tower-pocket.planted {
+  border-width: 2px;
+}
+
+.tower-pocket.not-started {
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+.tower-pocket.in-progress {
+  border-style: solid;
+}
+
+.tower-pocket .pocket-variety {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.tower-pocket .pocket-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+/* Grid legend */
+.grid-legend {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 2px solid var(--color-earth-200);
+}
+
+.legend-swatch.fallow {
+  background: var(--color-earth-50);
+}
+
+.legend-swatch.not-started {
+  background: var(--color-green-100);
+  border-style: dashed;
+  border-color: var(--color-green-400);
+  opacity: 0.7;
+}
+
+.legend-swatch.in-progress {
+  background: var(--color-green-200);
+  border-color: var(--color-green-500);
+}
+
+.legend-swatch.complete {
+  background: var(--color-gray-200);
+  border-color: var(--color-gray-400);
+  opacity: 0.5;
+}
+
+/* Grid header row */
+.grid-header-row {
+  display: contents;
+}
+
+.grid-corner {
+  min-width: 28px;
+  min-height: 28px;
+}
+
+/* Plantings list */
+.plantings-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.planting-list-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.planting-list-item:hover {
+  border-color: var(--color-primary-light);
+}
+
+.planting-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.planting-color-dot.inline {
+  display: inline-block;
+  margin-right: var(--space-2);
+  vertical-align: middle;
+}
+
+.planting-list-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.planting-list-info strong {
+  display: block;
+  font-size: var(--text-sm);
+}
+
+.planting-list-info .text-muted {
+  font-size: var(--text-xs);
+}
+
+.planting-list-dates {
+  text-align: right;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: flex-end;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.status-badge.not_started {
+  background: var(--color-gray-100);
+  color: var(--color-gray-600);
+}
+
+.status-badge.in_progress {
+  background: var(--color-green-100);
+  color: var(--color-green-800);
+}
+
+.status-badge.complete {
+  background: var(--color-earth-100);
+  color: var(--color-earth-700);
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: var(--space-4);
+}
+
+.modal-content {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  max-width: 560px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.modal-content.modal-sm {
+  max-width: 420px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.modal-header h3 {
+  font-size: var(--text-lg);
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: var(--text-xl);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  padding: var(--space-1);
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: var(--color-text);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Variety picker in planting modal */
+.category-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: var(--space-2) 0;
+}
+
+.chip {
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chip:hover {
+  border-color: var(--color-primary-light);
+}
+
+.chip.active {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.variety-picker-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-top: var(--space-2);
+}
+
+.variety-picker-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  transition: background 0.1s;
+  border-bottom: 1px solid var(--color-gray-100);
+}
+
+.variety-picker-item:last-child {
+  border-bottom: none;
+}
+
+.variety-picker-item:hover {
+  background: var(--color-green-50);
+}
+
+.variety-picker-item.selected {
+  background: var(--color-green-100);
+  font-weight: 600;
+}
+
+.variety-picker-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.variety-picker-name {
+  flex: 1;
+  font-size: var(--text-sm);
+}
+
+.variety-picker-category {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+/* Planting detail body */
+.planting-detail-body {
+  margin-bottom: var(--space-2);
+}
+
+.detail-grid.compact {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.detail-grid.compact .detail-item {
+  padding: var(--space-2);
+}
+
+/* Grid bed wrapper improvements */
+.grid-bed-wrapper {
+  display: inline-grid;
+  gap: 4px;
+  background: var(--color-earth-100);
+  border: 2px solid var(--color-earth-300);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+}
+
+.grid-row {
+  display: contents;
+}
+
+/* Support menu title */
+.support-menu-title {
+  font-weight: 600;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-1);
+}
+
 /* Responsive adjustments */
 @media (max-width: 640px) {
   .page-header-row {
