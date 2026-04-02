@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.container import Container
+from app.models.event import Event
 from app.models.planting import Planting
 from app.models.user import User
 from app.models.variety import Variety
@@ -501,6 +502,22 @@ async def activate_planting(
         planting.start_date = actual_start
 
     planting.status = "in_progress"
+
+    # Auto-create a planting event
+    planting_event = Event(
+        user_id=current_user.id,
+        event_type="planting",
+        date=actual_start,
+        container_id=planting.container_id,
+        planting_id=planting.id,
+        variety_id=planting.variety_id,
+        square_x=planting.square_x,
+        square_y=planting.square_y,
+        tower_level=planting.tower_level,
+        notes=f"Planting activated — {planting.planting_method or 'direct sow'}",
+    )
+    db.add(planting_event)
+
     await db.commit()
     await db.refresh(planting)
 

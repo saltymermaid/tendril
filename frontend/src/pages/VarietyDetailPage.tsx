@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 
 interface VarietyDetail {
@@ -26,6 +26,36 @@ interface VarietyDetail {
   notes: string | null
 }
 
+interface EventData {
+  id: number
+  event_type: string
+  date: string
+  quantity: number | null
+  unit: string | null
+  notes: string | null
+  created_at: string
+  container_name: string | null
+}
+
+interface NoteData {
+  id: number
+  content: string
+  date: string
+  photo_url: string | null
+  created_at: string
+  container_name: string | null
+}
+
+type TimelineItem = {
+  type: 'event'
+  date: string
+  data: EventData
+} | {
+  type: 'note'
+  date: string
+  data: NoteData
+}
+
 const MONTH_NAMES = [
   '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
@@ -45,9 +75,40 @@ export function VarietyDetailPage() {
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
 
+  // Events & Notes
+  const [events, setEvents] = useState<EventData[]>([])
+  const [notes, setNotes] = useState<NoteData[]>([])
+
+  // Note modal
+  const [showNoteModal, setShowNoteModal] = useState(false)
+  const [noteContent, setNoteContent] = useState('')
+  const [noteDate, setNoteDate] = useState(new Date().toISOString().split('T')[0])
+  const [actionLoading, setActionLoading] = useState(false)
+
   useEffect(() => {
     if (id) fetchVariety()
   }, [id])
+
+  const fetchEvents = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/events?variety_id=${id}`)
+      if (res.ok) setEvents(await res.json())
+    } catch { /* ignore */ }
+  }, [id])
+
+  const fetchNotes = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/notes?variety_id=${id}`)
+      if (res.ok) setNotes(await res.json())
+    } catch { /* ignore */ }
+  }, [id])
+
+  useEffect(() => {
+    if (id) {
+      fetchEvents()
+      fetchNotes()
+    }
+  }, [id, fetchEvents, fetchNotes])
 
   async function fetchVariety() {
     try {
@@ -77,6 +138,53 @@ export function VarietyDetailPage() {
     }
   }
 
+  async function handleAddNote(e: React.FormEvent) {
+    e.preventDefault()
+    if (!variety) return
+    setActionLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: noteContent,
+          date: noteDate,
+          variety_id: variety.id,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.detail || 'Failed to add note')
+      }
+      setShowNoteModal(false)
+      setNoteContent('')
+      setNoteDate(new Date().toISOString().split('T')[0])
+      fetchNotes()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to add note')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function handleDeleteNote(noteId: number) {
+    if (!confirm('Delete this note?')) return
+    try {
+      const res = await fetch(`/api/notes/${noteId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete note')
+      fetchNotes()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to delete note')
+    }
+  }
+
+  // Build combined timeline
+  const timeline: TimelineItem[] = [
+    ...events.map((e: EventData) => ({ type: 'event' as const, date: e.date, data: e })),
+    ...notes.map((n: NoteData) => ({ type: 'note' as const, date: n.date, data: n })),
+  ].sort((a, b) => b.date.localeCompare(a.date))
+
   if (loading) {
     return (
       <div className="loading-screen">
@@ -86,7 +194,7 @@ export function VarietyDetailPage() {
     )
   }
 
-  if (error || !variety) {
+  if (error && !variety) {
     return (
       <div className="catalog-page">
         <div className="form-message error">{error || 'Variety not found'}</div>
@@ -94,6 +202,8 @@ export function VarietyDetailPage() {
       </div>
     )
   }
+
+  if (!variety) return null
 
   const hasSeasonOverride = variety.season_override_start_month != null
 
@@ -207,6 +317,146 @@ export function VarietyDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Harvest Summary for this variety */}
+      {events.filter(e => e.event_type === 'harvest').length > 0 && (
+        <div className="harvest-summary">
+          <h3>🌾 Harvest Totals</h3>
+          <div className="harvest-totals">
+            {Object.entries(
+              events
+                .filter(e => e.event_type === 'harvest')
+                .reduce((acc, e) => {
+                  const unit = e.unit || 'count'
+                  acc[unit] = (acc[unit] || 0) + (e.quantity || 0)
+                  return acc
+                }, {} as Record<string, number>)
+            ).map(([unit, total]) => (
+              <span key={unit} className="harvest-total-badge">
+                {total} {unit}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Activity Timeline */}
+      <div className="activity-timeline">
+        <div className="timeline-header">
+          <h3>Activity</h3>
+          <button
+            onClick={() => {
+              setNoteDate(new Date().toISOString().split('T')[0])
+              setShowNoteModal(true)
+            }}
+            className="btn btn-outline-dark btn-sm"
+          >
+            📝 Add Note
+          </button>
+        </div>
+
+        {timeline.length === 0 ? (
+          <p className="text-muted" style={{ padding: '1rem 0' }}>
+            No activity yet. Events and notes will appear here.
+          </p>
+        ) : (
+          <div className="timeline-list">
+            {timeline.map(item => (
+              <div key={`${item.type}-${item.data.id}`} className="timeline-item">
+                <div className="timeline-item-icon">
+                  {item.type === 'event' ? (
+                    (item.data as EventData).event_type === 'harvest' ? '🌾' : '🌱'
+                  ) : '📝'}
+                </div>
+                <div className="timeline-item-content">
+                  <div className="timeline-item-header">
+                    <span className="timeline-item-title">
+                      {item.type === 'event' ? (
+                        (item.data as EventData).event_type === 'harvest'
+                          ? `Harvested ${(item.data as EventData).quantity || ''} ${(item.data as EventData).unit || ''}`
+                          : 'Planted'
+                      ) : 'Note'}
+                      {item.data.container_name && (
+                        <span className="text-muted" style={{ fontWeight: 400 }}>
+                          {' '}in {item.data.container_name}
+                        </span>
+                      )}
+                    </span>
+                    <span className="timeline-item-date">{item.date}</span>
+                  </div>
+                  {item.type === 'event' && (item.data as EventData).notes && (
+                    <p className="timeline-item-text">{(item.data as EventData).notes}</p>
+                  )}
+                  {item.type === 'note' && (
+                    <p className="timeline-item-text">{(item.data as NoteData).content}</p>
+                  )}
+                  {item.type === 'note' && (
+                    <button
+                      className="timeline-item-delete"
+                      onClick={() => handleDeleteNote(item.data.id)}
+                      title="Delete"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {error && <div className="form-message error">{error}</div>}
+
+      {/* Note Modal */}
+      {showNoteModal && (
+        <div className="modal-overlay" onClick={() => setShowNoteModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>📝 Add Note for {variety.name}</h3>
+              <button className="modal-close" onClick={() => setShowNoteModal(false)}>×</button>
+            </div>
+            <form onSubmit={handleAddNote}>
+              <div className="planting-detail-body">
+                <div className="form-group">
+                  <label>Note *</label>
+                  <textarea
+                    value={noteContent}
+                    onChange={e => setNoteContent(e.target.value)}
+                    rows={4}
+                    required
+                    placeholder="Observations about this variety..."
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Date</label>
+                  <input
+                    type="date"
+                    value={noteDate}
+                    onChange={e => setNoteDate(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={!noteContent.trim() || actionLoading}
+                >
+                  {actionLoading ? 'Saving...' : 'Save Note'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowNoteModal(false)}
+                  className="btn btn-outline-dark"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
