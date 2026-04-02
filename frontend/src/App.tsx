@@ -15,6 +15,7 @@ import { ContainerDetailPage } from '@/pages/ContainerDetailPage'
 import { ContainerFormPage } from '@/pages/ContainerFormPage'
 import { PlantingDetailPage } from '@/pages/PlantingDetailPage'
 import { GardenOverviewPage } from '@/pages/GardenOverviewPage'
+import { TimelinePage } from '@/pages/TimelinePage'
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
           >
             <Route path="/" element={<DashboardPage />} />
             <Route path="/overview" element={<GardenOverviewPage />} />
+            <Route path="/timeline" element={<TimelinePage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/catalog" element={<CatalogPage />} />
             <Route path="/catalog/categories/new" element={<CategoryFormPage />} />

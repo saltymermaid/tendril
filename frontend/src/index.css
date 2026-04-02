@@ -2376,3 +2376,141 @@ select.input {
   font-size: var(--text-xs);
   color: var(--color-earth-700);
 }
+
+/* ── Timeline Page ── */
+.timeline-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.timeline-scope-toggle {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.scope-btn {
+  padding: 0.4rem 1rem;
+  border: none;
+  background: var(--color-surface);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+
+.scope-btn:not(:last-child) {
+  border-right: 1px solid var(--color-border);
+}
+
+.scope-btn.active {
+  background: var(--color-green-600);
+  color: white;
+}
+
+.scope-btn:hover:not(.active) {
+  background: var(--color-gray-100);
+}
+
+.timeline-filter .form-select {
+  padding: 0.4rem 0.75rem;
+  font-size: var(--text-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.timeline-date-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.timeline-today-badge {
+  font-size: var(--text-xs);
+  background: #E53E3E;
+  color: white;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+/* ── Gantt Chart ── */
+.gantt-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.gantt-scroll-container {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 70vh;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  -webkit-overflow-scrolling: touch;
+}
+
+.gantt-svg {
+  display: block;
+}
+
+.gantt-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.gantt-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.gantt-legend-swatch {
+  width: 16px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid var(--color-gray-300);
+}
+
+.gantt-legend-dashed {
+  background: var(--color-gray-200);
+  border: 1px dashed var(--color-gray-500);
+}
+
+.gantt-legend-line {
+  width: 16px;
+  height: 2px;
+  background: #E53E3E;
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.empty-state h3 {
+  margin: var(--space-2) 0 var(--space-1);
+  color: var(--color-text);
+}
+
+.empty-state p {
+  margin: 0;
+}

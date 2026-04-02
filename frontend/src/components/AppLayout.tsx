@@ -14,6 +14,7 @@ export function AppLayout() {
         <nav className="header-nav">
           <NavLink to="/" className="nav-link" end>Dashboard</NavLink>
           <NavLink to="/overview" className="nav-link">Overview</NavLink>
+          <NavLink to="/timeline" className="nav-link">Timeline</NavLink>
           <NavLink to="/catalog" className="nav-link">Catalog</NavLink>
           <NavLink to="/containers" className="nav-link">Containers</NavLink>
           <NavLink to="/settings" className="nav-link">Settings</NavLink>

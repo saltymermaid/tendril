@@ -1,6 +1,6 @@
 """Plantings router — CRUD with overlap prevention and lifecycle management."""
 
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -21,7 +21,7 @@ from app.schemas.planting import (
     PlantingResponse,
     PlantingUpdate,
 )
-from app.services.lifecycle import compute_lifecycle_phase
+from app.services.lifecycle import compute_lifecycle_phase, _avg_days
 
 router = APIRouter(prefix="/api/plantings", tags=["plantings"])
 
@@ -242,6 +242,85 @@ async def create_planting(
 
     loaded = await _load_planting_with_relations(db, planting.id)
     return _planting_to_response(loaded)
+
+
+# --- Timeline endpoint for Gantt chart ---
+@router.get("/timeline")
+async def get_timeline(
+    start_date: date = Query(..., description="Timeline start date"),
+    end_date: date = Query(..., description="Timeline end date"),
+    container_id: int | None = Query(None, description="Filter to specific container"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get plantings with lifecycle phase boundaries for Gantt chart rendering.
+
+    Returns plantings that overlap with the given date range, including
+    computed phase boundaries (germination_end, harvest_start) for each.
+    """
+    query = (
+        select(Planting)
+        .options(
+            selectinload(Planting.variety).selectinload(Variety.category),
+            selectinload(Planting.container),
+        )
+        .where(
+            Planting.user_id == current_user.id,
+            # Planting overlaps with the requested range
+            Planting.start_date <= end_date,
+            Planting.end_date >= start_date,
+        )
+        .order_by(Planting.start_date)
+    )
+
+    if container_id is not None:
+        query = query.where(Planting.container_id == container_id)
+
+    result = await db.execute(query)
+    plantings = result.scalars().all()
+
+    timeline_items = []
+    for p in plantings:
+        variety = p.variety
+        germ_days = _avg_days(
+            variety.days_to_germination_min if variety else None,
+            variety.days_to_germination_max if variety else None,
+            default=7,
+        )
+        harvest_days = _avg_days(
+            variety.days_to_harvest_min if variety else None,
+            variety.days_to_harvest_max if variety else None,
+            default=60,
+        )
+
+        germination_end = (p.start_date + timedelta(days=germ_days)).isoformat()
+        harvest_start = (p.start_date + timedelta(days=harvest_days)).isoformat()
+
+        timeline_items.append({
+            "id": p.id,
+            "container_id": p.container_id,
+            "container_name": p.container.name if p.container else None,
+            "variety_id": p.variety_id,
+            "variety_name": variety.name if variety else None,
+            "category_name": variety.category.name if variety and variety.category else None,
+            "category_color": variety.category.color if variety and variety.category else None,
+            "start_date": p.start_date.isoformat(),
+            "end_date": p.end_date.isoformat(),
+            "germination_end": germination_end,
+            "harvest_start": harvest_start,
+            "status": p.status,
+            "square_x": p.square_x,
+            "square_y": p.square_y,
+            "tower_level": p.tower_level,
+        })
+
+    return {
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "container_id": container_id,
+        "total": len(timeline_items),
+        "plantings": timeline_items,
+    }
 
 
 # --- Get plantings for a container ---
