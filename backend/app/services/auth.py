@@ -26,9 +26,16 @@ def create_access_token(user_id: int) -> str:
     return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
 
 
-def create_refresh_token(user_id: int) -> str:
-    """Create a long-lived refresh token."""
-    expire = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
+def create_refresh_token(user_id: int, hours: int | None = None) -> str:
+    """Create a long-lived refresh token.
+
+    If *hours* is provided (user's configured session timeout), use that;
+    otherwise fall back to the site-wide ``refresh_token_expire_days`` setting.
+    """
+    if hours is not None:
+        expire = datetime.now(timezone.utc) + timedelta(hours=hours)
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
     payload = {
         "sub": str(user_id),
         "type": "refresh",

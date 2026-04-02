@@ -8,7 +8,15 @@ interface Settings {
   weather_lat: number | null
   weather_lon: number | null
   has_claude_api_key: boolean
+  session_timeout_hours: number
 }
+
+const SESSION_TIMEOUT_OPTIONS = [
+  { value: 4, label: '4 hours' },
+  { value: 8, label: '8 hours' },
+  { value: 24, label: '24 hours' },
+  { value: 48, label: '48 hours' },
+]
 
 const USDA_ZONES = [
   '1a', '1b', '2a', '2b', '3a', '3b', '4a', '4b',
@@ -29,6 +37,7 @@ export function SettingsPage() {
   const [weatherLat, setWeatherLat] = useState('')
   const [weatherLon, setWeatherLon] = useState('')
   const [claudeApiKey, setClaudeApiKey] = useState('')
+  const [sessionTimeoutHours, setSessionTimeoutHours] = useState(4)
 
   useEffect(() => {
     fetchSettings()
@@ -44,6 +53,7 @@ export function SettingsPage() {
         setWeatherZip(data.weather_zip_code)
         setWeatherLat(data.weather_lat?.toString() ?? '')
         setWeatherLon(data.weather_lon?.toString() ?? '')
+        setSessionTimeoutHours(data.session_timeout_hours ?? 4)
       }
     } catch {
       setMessage({ type: 'error', text: 'Failed to load settings' })
@@ -60,6 +70,7 @@ export function SettingsPage() {
     const body: Record<string, unknown> = {
       usda_zone: usdaZone,
       weather_zip_code: weatherZip,
+      session_timeout_hours: sessionTimeoutHours,
     }
 
     if (weatherLat) body.weather_lat = parseFloat(weatherLat)
@@ -184,6 +195,24 @@ export function SettingsPage() {
               ? 'API key is saved. Enter a new value to replace it.'
               : 'Required for seed packet photo import (Phase 2)'}
           </p>
+        </div>
+
+        {/* Session Timeout */}
+        <div className="form-group">
+          <label className="form-label">Session Timeout</label>
+          <div className="segmented-control">
+            {SESSION_TIMEOUT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className={`segmented-btn${sessionTimeoutHours === opt.value ? ' active' : ''}`}
+                onClick={() => setSessionTimeoutHours(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="form-help">How long you stay logged in. Takes effect on next login.</p>
         </div>
 
         {/* Account Info */}

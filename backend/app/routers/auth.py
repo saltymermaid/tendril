@@ -33,10 +33,20 @@ if settings.google_client_id and settings.google_client_secret:
     )
 
 
-def _set_auth_cookies(response: Response, user_id: int) -> None:
-    """Set access and refresh token cookies on the response."""
+def _set_auth_cookies(response: Response, user_id: int, session_timeout_hours: int | None = None) -> None:
+    """Set access and refresh token cookies on the response.
+
+    *session_timeout_hours* overrides the site-wide default when the user has
+    configured a custom session timeout in their settings.
+    """
     access_token = create_access_token(user_id)
-    refresh_token = create_refresh_token(user_id)
+    refresh_token = create_refresh_token(user_id, hours=session_timeout_hours)
+
+    # Compute refresh cookie max_age from hours or fall back to site default
+    if session_timeout_hours is not None:
+        refresh_max_age = session_timeout_hours * 3600
+    else:
+        refresh_max_age = settings.refresh_token_expire_days * 86400
 
     response.set_cookie(
         key="access_token",
@@ -53,7 +63,7 @@ def _set_auth_cookies(response: Response, user_id: int) -> None:
         httponly=True,
         secure=False,  # Set True in production with HTTPS
         samesite="lax",
-        max_age=settings.refresh_token_expire_days * 86400,
+        max_age=refresh_max_age,
         path="/api/auth",  # Only sent to auth endpoints
     )
 
@@ -141,7 +151,8 @@ async def google_callback(
         avatar_url=userinfo.get("picture"),
     )
 
-    _set_auth_cookies(response, user.id)
+    timeout_hours: int | None = (user.settings or {}).get("session_timeout_hours")
+    _set_auth_cookies(response, user.id, session_timeout_hours=timeout_hours)
 
     # Redirect to frontend after successful login
     response.status_code = status.HTTP_302_FOUND
@@ -172,7 +183,8 @@ async def dev_login(
         name=body.email.split("@")[0],
     )
 
-    _set_auth_cookies(response, user.id)
+    timeout_hours: int | None = (user.settings or {}).get("session_timeout_hours")
+    _set_auth_cookies(response, user.id, session_timeout_hours=timeout_hours)
     return UserResponse.model_validate(user)
 
 
@@ -214,7 +226,8 @@ async def refresh_tokens(
             detail="User not found",
         )
 
-    _set_auth_cookies(response, user.id)
+    timeout_hours: int | None = (user.settings or {}).get("session_timeout_hours")
+    _set_auth_cookies(response, user.id, session_timeout_hours=timeout_hours)
     return UserResponse.model_validate(user)
 
 

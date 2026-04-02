@@ -19,6 +19,7 @@ def _settings_to_response(settings: dict) -> SettingsResponse:
         weather_lat=settings.get("weather_lat"),
         weather_lon=settings.get("weather_lon"),
         has_claude_api_key=bool(settings.get("claude_api_key")),
+        session_timeout_hours=settings.get("session_timeout_hours", 4),
     )
 
 
@@ -42,6 +43,8 @@ async def update_settings(
     # Only update fields that were explicitly provided
     update_data = body.model_dump(exclude_unset=True)
 
+    VALID_SESSION_TIMEOUTS = {4, 8, 24, 48}
+
     for key, value in update_data.items():
         if key == "claude_api_key":
             # Only update if a non-empty value is provided
@@ -51,6 +54,9 @@ async def update_settings(
             elif value == "":
                 settings.pop("claude_api_key", None)
             # If None (not provided), skip
+        elif key == "session_timeout_hours":
+            if value in VALID_SESSION_TIMEOUTS:
+                settings["session_timeout_hours"] = value
         else:
             if value is not None:
                 settings[key] = value

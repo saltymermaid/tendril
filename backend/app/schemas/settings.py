@@ -10,6 +10,7 @@ class SettingsResponse(BaseModel):
     weather_lat: float | None
     weather_lon: float | None
     has_claude_api_key: bool  # Never return the actual key
+    session_timeout_hours: int  # Default 4, max 48
 
 
 class SettingsUpdate(BaseModel):
@@ -19,3 +20,4 @@ class SettingsUpdate(BaseModel):
     weather_lat: float | None = None
     weather_lon: float | None = None
     claude_api_key: str | None = None  # Only set when user provides a new key
+    session_timeout_hours: int | None = None  # 4, 8, 24, or 48
