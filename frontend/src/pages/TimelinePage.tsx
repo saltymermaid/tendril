@@ -5,6 +5,11 @@ import { GanttChart, TimelinePlanting } from '../components/GanttChart'
 interface ContainerOption {
   id: number
   name: string
+  type: string
+  width: number | null
+  height: number | null
+  levels: number | null
+  pockets_per_level: number | null
 }
 
 export function TimelinePage() {
@@ -16,6 +21,7 @@ export function TimelinePage() {
   // View controls
   const [scope, setScope] = useState<'3month' | 'year'>('3month')
   const [containerId, setContainerId] = useState<number | null>(null)
+  const [groupBy, setGroupBy] = useState<'square' | 'container' | 'none'>('square')
 
   // Compute date range based on scope
   const today = new Date()
@@ -46,7 +52,15 @@ export function TimelinePage() {
       const res = await apiFetch('/api/containers', { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
-        setContainers(data.map((c: { id: number; name: string }) => ({ id: c.id, name: c.name })))
+        setContainers(data.map((c: ContainerOption) => ({
+          id: c.id,
+          name: c.name,
+          type: c.type,
+          width: c.width ?? null,
+          height: c.height ?? null,
+          levels: c.levels ?? null,
+          pockets_per_level: c.pockets_per_level ?? null,
+        })))
       }
     } catch {
       // ignore
@@ -80,6 +94,18 @@ export function TimelinePage() {
     fetchTimeline()
   }, [fetchTimeline])
 
+  // When switching containers, reset groupBy to sensible default
+  function handleContainerChange(id: number | null) {
+    setContainerId(id)
+    if (id === null) {
+      // All containers — use container grouping, but preserve square/planting choice
+      setGroupBy(prev => prev === 'none' ? 'container' : prev)
+    } else {
+      // Single container — square view is the main new feature
+      setGroupBy(prev => prev === 'container' ? 'square' : prev)
+    }
+  }
+
   return (
     <div className="page">
       <div className="page-header">
@@ -106,7 +132,7 @@ export function TimelinePage() {
         <div className="timeline-filter">
           <select
             value={containerId ?? ''}
-            onChange={(e) => setContainerId(e.target.value ? Number(e.target.value) : null)}
+            onChange={(e) => handleContainerChange(e.target.value ? Number(e.target.value) : null)}
             className="form-select"
           >
             <option value="">All Containers</option>
@@ -116,6 +142,22 @@ export function TimelinePage() {
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Group by toggle */}
+        <div className="timeline-scope-toggle">
+          <button
+            className={`scope-btn ${groupBy === 'square' ? 'active' : ''}`}
+            onClick={() => setGroupBy('square')}
+          >
+            By Square
+          </button>
+          <button
+            className={`scope-btn ${groupBy !== 'square' ? 'active' : ''}`}
+            onClick={() => setGroupBy(containerId === null ? 'container' : 'none')}
+          >
+            By Planting
+          </button>
         </div>
 
         <div className="timeline-date-info">
@@ -135,18 +177,13 @@ export function TimelinePage() {
           <span className="tendril-icon">🌱</span>
           <p>Loading timeline...</p>
         </div>
-      ) : plantings.length === 0 ? (
-        <div className="empty-state">
-          <span style={{ fontSize: '3rem' }}>📅</span>
-          <h3>No plantings in this range</h3>
-          <p>Create some plantings to see them on the timeline.</p>
-        </div>
       ) : (
         <GanttChart
           plantings={plantings}
+          containers={containers}
           startDate={startDate}
           endDate={endDate}
-          groupBy={containerId === null ? 'container' : 'none'}
+          groupBy={groupBy}
         />
       )}
     </div>

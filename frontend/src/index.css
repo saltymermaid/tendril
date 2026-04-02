@@ -1383,8 +1383,7 @@ select.form-input {
   align-items: center;
 }
 
-.grid-row-label,
-.grid-col-label {
+.grid-row-label {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1393,6 +1392,19 @@ select.form-input {
   color: var(--color-text-secondary);
   min-width: 28px;
   min-height: 28px;
+  flex-shrink: 0;
+}
+
+.grid-col-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  width: 48px;
+  min-height: 28px;
+  flex-shrink: 0;
 }
 
 .grid-col-labels {

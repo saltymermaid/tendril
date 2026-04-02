@@ -313,6 +313,8 @@ async def get_timeline(
             "status": p.status,
             "square_x": p.square_x,
             "square_y": p.square_y,
+            "square_width": p.square_width,
+            "square_height": p.square_height,
             "tower_level": p.tower_level,
         })
 
