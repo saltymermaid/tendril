@@ -1,0 +1,62 @@
+# ── Stage 1: Build ──────────────────────────────────────────────
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# ── Stage 2: Production ────────────────────────────────────────
+FROM python:3.12-slim
+
+LABEL org.opencontainers.image.source="https://github.com/melissablades/tendril"
+LABEL org.opencontainers.image.description="Tendril API — FastAPI backend"
+
+# Create non-root user
+RUN groupadd -r tendril && useradd -r -g tendril -d /app -s /sbin/nologin tendril
+
+WORKDIR /app
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed Python packages from builder
+COPY --from=builder /install /usr/local
+
+# Copy application code
+COPY . .
+
+# Remove dev/test files from production image
+RUN rm -rf app/tests/ scripts/ .env* *.md
+
+# Change ownership
+RUN chown -R tendril:tendril /app
+
+USER tendril
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
+
+EXPOSE 8000
+
+# Run with gunicorn + uvicorn workers for production
+# Workers = 2 * CPU + 1 (conservative for Beelink mini PC)
+CMD ["gunicorn", "app.main:app", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--workers", "3", \
+     "--bind", "0.0.0.0:8000", \
+     "--timeout", "120", \
+     "--keep-alive", "5", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--log-level", "info"]

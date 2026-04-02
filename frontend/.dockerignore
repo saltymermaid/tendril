@@ -1,0 +1,30 @@
+# Dependencies (will be installed fresh)
+node_modules/
+
+# Build output
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.*
+
+# Docker
+Dockerfile
+Dockerfile.prod
+docker-compose*.yml
+
+# Docs
+*.md
+LICENSE
+
+# Git
+.git/
+.gitignore
+
+# Test artifacts
+coverage/
+.nyc_output/
