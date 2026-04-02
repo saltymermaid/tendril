@@ -18,6 +18,7 @@ from app.routers.settings import router as settings_router
 from app.routers.tasks import router as tasks_router
 from app.routers.varieties import router as varieties_router
 from app.routers.weather import router as weather_router
+from app.routers.push import router as push_router
 
 
 @asynccontextmanager
@@ -61,6 +62,7 @@ app.include_router(settings_router)
 app.include_router(tasks_router)
 app.include_router(varieties_router)
 app.include_router(weather_router)
+app.include_router(push_router)
 
 
 @app.get("/api/health")

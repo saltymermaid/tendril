@@ -19,6 +19,9 @@ boto3==1.38.0
 # AI
 anthropic==0.52.0
 
+# Push notifications
+pywebpush==2.0.1
+
 # Scheduling
 apscheduler==3.11.0
 

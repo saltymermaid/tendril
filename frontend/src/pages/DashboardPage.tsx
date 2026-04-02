@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { WeatherWidget } from '@/components/WeatherWidget'
+import { NotificationPrompt } from '@/components/NotificationPrompt'
 
 interface TaskData {
   id: number
@@ -311,8 +312,9 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* Right Column: Weather */}
+        {/* Right Column: Weather + Notifications */}
         <div className="dashboard-column dashboard-column-side">
+          <NotificationPrompt />
           <WeatherWidget />
         </div>
       </div>
