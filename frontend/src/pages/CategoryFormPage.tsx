@@ -277,6 +277,9 @@ export function CategoryFormPage() {
                     onChange={(e) => updateSeason(idx, 'start_day', parseInt(e.target.value) || 1)}
                     min={1}
                     max={31}
+                    autoComplete="off"
+                    data-1p-ignore
+                    data-lpignore="true"
                   />
                 </div>
               </div>
@@ -299,6 +302,9 @@ export function CategoryFormPage() {
                     onChange={(e) => updateSeason(idx, 'end_day', parseInt(e.target.value) || 1)}
                     min={1}
                     max={31}
+                    autoComplete="off"
+                    data-1p-ignore
+                    data-lpignore="true"
                   />
                 </div>
               </div>

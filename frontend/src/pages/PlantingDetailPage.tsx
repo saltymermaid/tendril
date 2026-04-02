@@ -653,38 +653,47 @@ export function PlantingDetailPage() {
               <h3>🌾 Log Harvest</h3>
               <button className="modal-close" onClick={() => setShowHarvestModal(false)}>×</button>
             </div>
-            <form onSubmit={handleLogHarvest}>
+            <form onSubmit={handleLogHarvest} style={{ marginTop: 'var(--space-2)' }}>
               <div className="planting-detail-body">
                 <div className="form-group">
-                  <label>Quantity *</label>
+                  <label className="form-label">Quantity *</label>
                   <input
                     type="number"
+                    className="form-input"
                     min="1"
                     value={harvestQuantity}
                     onChange={e => setHarvestQuantity(e.target.value)}
                     required
                     placeholder="How many?"
+                    autoComplete="off"
+                    data-1p-ignore
+                    data-lpignore="true"
                   />
                 </div>
                 <div className="form-group">
-                  <label>Unit</label>
-                  <select value={harvestUnit} onChange={e => setHarvestUnit(e.target.value)}>
+                  <label className="form-label">Unit</label>
+                  <select className="form-input" value={harvestUnit} onChange={e => setHarvestUnit(e.target.value)}>
                     {HARVEST_UNITS.map(u => (
                       <option key={u.value} value={u.value}>{u.label}</option>
                     ))}
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Date</label>
+                  <label className="form-label">Date</label>
                   <input
                     type="date"
+                    className="form-input"
                     value={harvestDate}
                     onChange={e => setHarvestDate(e.target.value)}
+                    autoComplete="off"
+                    data-1p-ignore
+                    data-lpignore="true"
                   />
                 </div>
                 <div className="form-group">
-                  <label>Notes (optional)</label>
+                  <label className="form-label">Notes (optional)</label>
                   <textarea
+                    className="form-input"
                     value={harvestNotes}
                     onChange={e => setHarvestNotes(e.target.value)}
                     rows={2}
@@ -721,11 +730,12 @@ export function PlantingDetailPage() {
               <h3>📝 Add Note</h3>
               <button className="modal-close" onClick={() => setShowNoteModal(false)}>×</button>
             </div>
-            <form onSubmit={handleAddNote}>
+            <form onSubmit={handleAddNote} style={{ marginTop: 'var(--space-2)' }}>
               <div className="planting-detail-body">
                 <div className="form-group">
-                  <label>Note *</label>
+                  <label className="form-label">Note *</label>
                   <textarea
+                    className="form-input"
                     value={noteContent}
                     onChange={e => setNoteContent(e.target.value)}
                     rows={4}
@@ -734,11 +744,15 @@ export function PlantingDetailPage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Date</label>
+                  <label className="form-label">Date</label>
                   <input
                     type="date"
+                    className="form-input"
                     value={noteDate}
                     onChange={e => setNoteDate(e.target.value)}
+                    autoComplete="off"
+                    data-1p-ignore
+                    data-lpignore="true"
                   />
                 </div>
               </div>

@@ -394,8 +394,8 @@ export function TasksPage() {
 
       {/* Create Task Modal */}
       {showCreateModal && (
-        <div className="modal-backdrop" onClick={() => setShowCreateModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+          <div className="modal-content modal-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>New Task</h3>
               <button className="modal-close" onClick={() => setShowCreateModal(false)}>
@@ -432,6 +432,9 @@ export function TasksPage() {
                   className="form-input"
                   value={form.due_date}
                   onChange={(e) => setForm({ ...form, due_date: e.target.value })}
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
                 />
               </div>
               <div className="form-group">

@@ -478,6 +478,9 @@ export function ContainerDetailPage() {
           className="time-slider-date"
           value={selectedDate}
           onChange={e => setSelectedDate(e.target.value)}
+          autoComplete="off"
+          data-1p-ignore
+          data-lpignore="true"
         />
         <button className="time-slider-btn" onClick={() => changeDate(1)} title="Next day">▶</button>
         <button className="time-slider-btn" onClick={() => changeDate(7)} title="Forward 1 week">⏩</button>
@@ -735,6 +738,9 @@ export function ContainerDetailPage() {
                     value={plantingForm.start_date}
                     onChange={(e) => setPlantingForm({ ...plantingForm, start_date: e.target.value })}
                     required
+                    autoComplete="off"
+                    data-1p-ignore
+                    data-lpignore="true"
                   />
                 </div>
                 <div className="form-group">
@@ -745,6 +751,9 @@ export function ContainerDetailPage() {
                     value={plantingForm.end_date}
                     onChange={(e) => setPlantingForm({ ...plantingForm, end_date: e.target.value })}
                     required
+                    autoComplete="off"
+                    data-1p-ignore
+                    data-lpignore="true"
                   />
                 </div>
               </div>
@@ -798,6 +807,9 @@ export function ContainerDetailPage() {
                     value={plantingForm.quantity}
                     onChange={(e) => setPlantingForm({ ...plantingForm, quantity: e.target.value })}
                     placeholder="Optional"
+                    autoComplete="off"
+                    data-1p-ignore
+                    data-lpignore="true"
                   />
                 </div>
               </div>
