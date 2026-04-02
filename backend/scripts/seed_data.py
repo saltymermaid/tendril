@@ -21,24 +21,29 @@ from app.models import (
 )
 
 
+def _emoji_svg(emoji: str) -> str:
+    """Wrap an emoji in a minimal SVG for use as a category icon."""
+    return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><text y="28" font-size="28">{emoji}</text></svg>'
+
+
 # ─── Categories ───────────────────────────────────────────────────────────────
 CATEGORIES = [
-    {"name": "Tomatoes", "color": "#E53E3E", "harvest_type": "continuous", "icon_svg": "🍅"},
-    {"name": "Peppers", "color": "#DD6B20", "harvest_type": "continuous", "icon_svg": "🌶️"},
-    {"name": "Cucumbers", "color": "#38A169", "harvest_type": "continuous", "icon_svg": "🥒"},
-    {"name": "Squash", "color": "#D69E2E", "harvest_type": "continuous", "icon_svg": "🎃"},
-    {"name": "Beans", "color": "#276749", "harvest_type": "continuous", "icon_svg": "🫘"},
-    {"name": "Sweet Potatoes", "color": "#C05621", "harvest_type": "single", "icon_svg": "🍠"},
-    {"name": "Bunching Onions", "color": "#9F7AEA", "harvest_type": "single", "icon_svg": "🧅"},
-    {"name": "Peas", "color": "#48BB78", "harvest_type": "continuous", "icon_svg": "🫛"},
-    {"name": "Lettuce", "color": "#68D391", "harvest_type": "continuous", "icon_svg": "🥬"},
-    {"name": "Kale", "color": "#2F855A", "harvest_type": "continuous", "icon_svg": "🥗"},
-    {"name": "Spinach", "color": "#22543D", "harvest_type": "continuous", "icon_svg": "🍃"},
-    {"name": "Cabbage", "color": "#4FD1C5", "harvest_type": "single", "icon_svg": "🥬"},
-    {"name": "Melons", "color": "#F6AD55", "harvest_type": "single", "icon_svg": "🍈"},
-    {"name": "Radishes", "color": "#FC8181", "harvest_type": "single", "icon_svg": "🔴"},
-    {"name": "Herbs", "color": "#9AE6B4", "harvest_type": "continuous", "icon_svg": "🌿"},
-    {"name": "Flowers", "color": "#F687B3", "harvest_type": "continuous", "icon_svg": "🌸"},
+    {"name": "Tomatoes", "color": "#E53E3E", "harvest_type": "continuous", "icon_svg": _emoji_svg("🍅")},
+    {"name": "Peppers", "color": "#DD6B20", "harvest_type": "continuous", "icon_svg": _emoji_svg("🌶️")},
+    {"name": "Cucumbers", "color": "#38A169", "harvest_type": "continuous", "icon_svg": _emoji_svg("🥒")},
+    {"name": "Squash", "color": "#D69E2E", "harvest_type": "continuous", "icon_svg": _emoji_svg("🎃")},
+    {"name": "Beans", "color": "#276749", "harvest_type": "continuous", "icon_svg": _emoji_svg("🫘")},
+    {"name": "Sweet Potatoes", "color": "#C05621", "harvest_type": "single", "icon_svg": _emoji_svg("🍠")},
+    {"name": "Bunching Onions", "color": "#9F7AEA", "harvest_type": "single", "icon_svg": _emoji_svg("🧅")},
+    {"name": "Peas", "color": "#48BB78", "harvest_type": "continuous", "icon_svg": _emoji_svg("🫛")},
+    {"name": "Lettuce", "color": "#68D391", "harvest_type": "continuous", "icon_svg": _emoji_svg("🥬")},
+    {"name": "Kale", "color": "#2F855A", "harvest_type": "continuous", "icon_svg": _emoji_svg("🥗")},
+    {"name": "Spinach", "color": "#22543D", "harvest_type": "continuous", "icon_svg": _emoji_svg("🍃")},
+    {"name": "Cabbage", "color": "#4FD1C5", "harvest_type": "single", "icon_svg": _emoji_svg("🥬")},
+    {"name": "Melons", "color": "#F6AD55", "harvest_type": "single", "icon_svg": _emoji_svg("🍈")},
+    {"name": "Radishes", "color": "#FC8181", "harvest_type": "single", "icon_svg": _emoji_svg("🔴")},
+    {"name": "Herbs", "color": "#9AE6B4", "harvest_type": "continuous", "icon_svg": _emoji_svg("🌿")},
+    {"name": "Flowers", "color": "#F687B3", "harvest_type": "continuous", "icon_svg": _emoji_svg("🌸")},
 ]
 
 # ─── Planting Seasons for Zone 10a ───────────────────────────────────────────

@@ -219,13 +219,34 @@ export function CategoryFormPage() {
 
           <div className="form-group">
             <label className="form-label">Icon SVG (optional)</label>
-            <textarea
-              className="input textarea"
-              value={form.icon_svg}
-              onChange={(e) => setForm({ ...form, icon_svg: e.target.value })}
-              placeholder='<svg viewBox="0 0 24 24">...</svg>'
-              rows={3}
-            />
+            <div className="icon-upload-row">
+              <input
+                type="file"
+                accept=".svg,image/svg+xml"
+                className="input"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = (evt) => {
+                    const text = evt.target?.result as string
+                    setForm((prev) => ({ ...prev, icon_svg: text || '' }))
+                  }
+                  reader.readAsText(file)
+                  // reset input so same file can be re-selected
+                  e.target.value = ''
+                }}
+              />
+              {form.icon_svg && (
+                <button
+                  type="button"
+                  className="btn btn-outline-dark btn-sm"
+                  onClick={() => setForm((prev) => ({ ...prev, icon_svg: '' }))}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             {form.icon_svg && (
               <div className="icon-preview">
                 <span className="form-label">Preview:</span>

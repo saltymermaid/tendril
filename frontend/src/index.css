@@ -1190,6 +1190,17 @@ select.form-input {
   background: var(--color-surface);
 }
 
+/* Icon upload row (file input + Clear button side by side) */
+.icon-upload-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.icon-upload-row .input[type="file"] {
+  flex: 1;
+}
+
 /* Icon preview */
 .icon-preview {
   display: flex;
