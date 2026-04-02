@@ -1,7 +1,9 @@
 """Container CRUD router — per-user garden containers."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from datetime import date
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -9,6 +11,8 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.container import Container, SquareSupport
 from app.models.planting import Planting
+from app.models.variety import Variety
+from app.models.category import Category
 from app.models.user import User
 from app.schemas.container import (
     ContainerCreate,
@@ -20,6 +24,100 @@ from app.schemas.container import (
 )
 
 router = APIRouter(prefix="/api/containers", tags=["containers"])
+
+
+@router.get("/overview")
+async def containers_overview(
+    as_of: date | None = Query(None, alias="date", description="View plantings active on this date"),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Return all containers with their plantings for the overview page."""
+    view_date = as_of or date.today()
+
+    # Get all containers
+    stmt = (
+        select(Container)
+        .options(selectinload(Container.square_supports))
+        .where(Container.user_id == user.id)
+        .order_by(Container.name)
+    )
+    result = await db.execute(stmt)
+    containers = result.scalars().all()
+
+    # Get all plantings active on the view date
+    planting_stmt = (
+        select(Planting)
+        .options(
+            selectinload(Planting.variety).selectinload(Variety.category),
+        )
+        .where(
+            Planting.user_id == user.id,
+            Planting.start_date <= view_date,
+            Planting.end_date > view_date,
+        )
+    )
+    planting_result = await db.execute(planting_stmt)
+    all_plantings = planting_result.scalars().all()
+
+    # Group plantings by container
+    plantings_by_container: dict[int, list] = {}
+    for p in all_plantings:
+        plantings_by_container.setdefault(p.container_id, []).append(p)
+
+    # Build response
+    overview = []
+    for c in containers:
+        container_plantings = plantings_by_container.get(c.id, [])
+
+        # Calculate total slots
+        if c.type == "grid_bed":
+            total_slots = (c.width or 0) * (c.height or 0)
+        else:
+            total_slots = (c.levels or 0) * (c.pockets_per_level or 0)
+
+        # Count planted slots (unique squares occupied)
+        planted_slots = set()
+        for p in container_plantings:
+            if c.type == "grid_bed":
+                for dx in range(p.square_width):
+                    for dy in range(p.square_height):
+                        planted_slots.add((p.square_x + dx, p.square_y + dy))
+            else:
+                planted_slots.add((p.tower_level, p.square_x))
+
+        compact_plantings = []
+        for p in container_plantings:
+            variety = p.variety
+            category = variety.category if variety else None
+            compact_plantings.append({
+                "id": p.id,
+                "square_x": p.square_x,
+                "square_y": p.square_y,
+                "square_width": p.square_width,
+                "square_height": p.square_height,
+                "tower_level": p.tower_level,
+                "status": p.status,
+                "variety_name": variety.name if variety else None,
+                "category_name": category.name if category else None,
+                "category_color": category.color if category else None,
+            })
+
+        overview.append({
+            "id": c.id,
+            "name": c.name,
+            "type": c.type,
+            "location_description": c.location_description,
+            "width": c.width,
+            "height": c.height,
+            "levels": c.levels,
+            "pockets_per_level": c.pockets_per_level,
+            "total_slots": total_slots,
+            "planted_slots": len(planted_slots),
+            "plantings": compact_plantings,
+        })
+
+    return overview
 
 
 @router.get("", response_model=list[ContainerListResponse])
