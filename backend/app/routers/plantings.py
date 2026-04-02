@@ -1,9 +1,9 @@
-"""Plantings router — CRUD with overlap prevention."""
+"""Plantings router — CRUD with overlap prevention and lifecycle management."""
 
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import and_, or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -13,9 +13,40 @@ from app.models.container import Container
 from app.models.planting import Planting
 from app.models.user import User
 from app.models.variety import Variety
-from app.schemas.planting import PlantingCreate, PlantingResponse, PlantingUpdate
+from app.schemas.planting import (
+    ActivatePlanting,
+    CompletePlanting,
+    LifecyclePhaseResponse,
+    PlantingCreate,
+    PlantingResponse,
+    PlantingUpdate,
+)
+from app.services.lifecycle import compute_lifecycle_phase
 
 router = APIRouter(prefix="/api/plantings", tags=["plantings"])
+
+
+def _compute_lifecycle(p: Planting) -> LifecyclePhaseResponse | None:
+    """Compute lifecycle phase for a planting using its variety data."""
+    variety = p.variety
+    phase = compute_lifecycle_phase(
+        status=p.status,
+        start_date=p.start_date,
+        end_date=p.end_date,
+        days_to_germination_min=variety.days_to_germination_min if variety else None,
+        days_to_germination_max=variety.days_to_germination_max if variety else None,
+        days_to_harvest_min=variety.days_to_harvest_min if variety else None,
+        days_to_harvest_max=variety.days_to_harvest_max if variety else None,
+    )
+    return LifecyclePhaseResponse(
+        phase=phase.phase,
+        phase_display=phase.phase_display,
+        day_number=phase.day_number,
+        total_days=phase.total_days,
+        phase_day=phase.phase_day,
+        phase_total_days=phase.phase_total_days,
+        progress_percent=phase.progress_percent,
+    )
 
 
 def _planting_to_response(p: Planting) -> PlantingResponse:
@@ -54,7 +85,21 @@ def _planting_to_response(p: Planting) -> PlantingResponse:
         category_name=category_name,
         category_color=category_color,
         container_name=container_name,
+        lifecycle=_compute_lifecycle(p),
     )
+
+
+async def _load_planting_with_relations(db: AsyncSession, planting_id: int) -> Planting | None:
+    """Load a planting with variety, category, and container relationships."""
+    result = await db.execute(
+        select(Planting)
+        .options(
+            selectinload(Planting.variety).selectinload(Variety.category),
+            selectinload(Planting.container),
+        )
+        .where(Planting.id == planting_id)
+    )
+    return result.scalar_one_or_none()
 
 
 async def _check_overlap(
@@ -75,11 +120,9 @@ async def _check_overlap(
     (square_x + square_width - 1, square_y + square_height - 1).
     Two plantings overlap if their square ranges intersect AND their date ranges overlap.
     """
-    # Build query for plantings in the same container that overlap in date range
     query = select(Planting).where(
         Planting.user_id == user_id,
         Planting.container_id == container_id,
-        # Date overlap: existing.start < new.end AND existing.end > new.start
         Planting.start_date < end_date,
         Planting.end_date > start_date,
     )
@@ -90,7 +133,6 @@ async def _check_overlap(
     result = await db.execute(query)
     existing_plantings = result.scalars().all()
 
-    # Check spatial overlap for each existing planting
     new_x_min, new_x_max = square_x, square_x + square_width - 1
     new_y_min, new_y_max = square_y, square_y + square_height - 1
 
@@ -100,7 +142,6 @@ async def _check_overlap(
         ex_y_min = existing.square_y
         ex_y_max = existing.square_y + existing.square_height - 1
 
-        # Check if rectangles overlap
         if (
             new_x_min <= ex_x_max
             and new_x_max >= ex_x_min
@@ -123,7 +164,6 @@ async def create_planting(
     current_user: User = Depends(get_current_user),
 ):
     """Create a new planting with overlap prevention."""
-    # Validate container belongs to user
     result = await db.execute(
         select(Container).where(
             Container.id == body.container_id,
@@ -134,7 +174,6 @@ async def create_planting(
     if not container:
         raise HTTPException(status_code=404, detail="Container not found")
 
-    # Validate variety belongs to user
     result = await db.execute(
         select(Variety).where(
             Variety.id == body.variety_id,
@@ -145,11 +184,9 @@ async def create_planting(
     if not variety:
         raise HTTPException(status_code=404, detail="Variety not found")
 
-    # Validate dates
     if body.end_date <= body.start_date:
         raise HTTPException(status_code=400, detail="end_date must be after start_date")
 
-    # Validate square bounds for grid_bed
     if container.type == "grid_bed":
         if (
             body.square_x < 0
@@ -163,7 +200,6 @@ async def create_planting(
                 f"({container.width}x{container.height})",
             )
 
-    # Validate tower level
     if container.type == "tower":
         if body.tower_level is None:
             raise HTTPException(status_code=400, detail="tower_level required for tower containers")
@@ -173,7 +209,6 @@ async def create_planting(
                 detail=f"tower_level must be 0-{container.levels - 1}",
             )
 
-    # Check for overlapping plantings
     await _check_overlap(
         db=db,
         user_id=current_user.id,
@@ -205,17 +240,8 @@ async def create_planting(
     await db.commit()
     await db.refresh(planting)
 
-    # Reload with relationships
-    result = await db.execute(
-        select(Planting)
-        .options(
-            selectinload(Planting.variety).selectinload(Variety.category),
-            selectinload(Planting.container),
-        )
-        .where(Planting.id == planting.id)
-    )
-    planting = result.scalar_one()
-    return _planting_to_response(planting)
+    loaded = await _load_planting_with_relations(db, planting.id)
+    return _planting_to_response(loaded)
 
 
 # --- Get plantings for a container ---
@@ -227,7 +253,6 @@ async def get_container_plantings(
     current_user: User = Depends(get_current_user),
 ):
     """Get all plantings for a container, optionally filtered by date."""
-    # Verify container belongs to user
     result = await db.execute(
         select(Container).where(
             Container.id == container_id,
@@ -312,7 +337,6 @@ async def update_planting(
 
     update_data = body.model_dump(exclude_unset=True)
 
-    # If dates are changing, re-check overlap
     new_start = update_data.get("start_date", planting.start_date)
     new_end = update_data.get("end_date", planting.end_date)
     if new_end <= new_start:
@@ -338,17 +362,127 @@ async def update_planting(
     await db.commit()
     await db.refresh(planting)
 
-    # Reload with relationships
+    loaded = await _load_planting_with_relations(db, planting.id)
+    return _planting_to_response(loaded)
+
+
+# --- Activate planting (Not Started → In Progress) ---
+@router.post("/{planting_id}/activate", response_model=PlantingResponse)
+async def activate_planting(
+    planting_id: int,
+    body: ActivatePlanting | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Transition a planting from Not Started to In Progress.
+
+    Optionally set the actual start date (defaults to today).
+    If the start date changes, re-checks overlap.
+    """
     result = await db.execute(
-        select(Planting)
-        .options(
-            selectinload(Planting.variety).selectinload(Variety.category),
-            selectinload(Planting.container),
+        select(Planting).where(
+            Planting.id == planting_id,
+            Planting.user_id == current_user.id,
         )
-        .where(Planting.id == planting.id)
     )
-    planting = result.scalar_one()
-    return _planting_to_response(planting)
+    planting = result.scalar_one_or_none()
+    if not planting:
+        raise HTTPException(status_code=404, detail="Planting not found")
+
+    if planting.status != "not_started":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot activate planting with status '{planting.status}'. "
+            "Only 'not_started' plantings can be activated.",
+        )
+
+    actual_start = date.today()
+    if body and body.actual_start_date:
+        actual_start = body.actual_start_date
+
+    # If start date is changing, re-check overlap
+    if actual_start != planting.start_date:
+        if actual_start >= planting.end_date:
+            raise HTTPException(
+                status_code=400,
+                detail="actual_start_date must be before end_date",
+            )
+        await _check_overlap(
+            db=db,
+            user_id=current_user.id,
+            container_id=planting.container_id,
+            square_x=planting.square_x,
+            square_y=planting.square_y,
+            square_width=planting.square_width,
+            square_height=planting.square_height,
+            start_date=actual_start,
+            end_date=planting.end_date,
+            exclude_planting_id=planting.id,
+        )
+        planting.start_date = actual_start
+
+    planting.status = "in_progress"
+    await db.commit()
+    await db.refresh(planting)
+
+    loaded = await _load_planting_with_relations(db, planting.id)
+    return _planting_to_response(loaded)
+
+
+# --- Complete planting (In Progress → Complete) ---
+@router.post("/{planting_id}/complete", response_model=PlantingResponse)
+async def complete_planting(
+    planting_id: int,
+    body: CompletePlanting,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Transition a planting from In Progress to Complete.
+
+    Requires a removal reason. Optionally set the actual end date (defaults to today).
+    """
+    result = await db.execute(
+        select(Planting).where(
+            Planting.id == planting_id,
+            Planting.user_id == current_user.id,
+        )
+    )
+    planting = result.scalar_one_or_none()
+    if not planting:
+        raise HTTPException(status_code=404, detail="Planting not found")
+
+    if planting.status != "in_progress":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot complete planting with status '{planting.status}'. "
+            "Only 'in_progress' plantings can be completed.",
+        )
+
+    valid_reasons = {"harvest_complete", "died", "pulled_early", "pest_disease", "other"}
+    if body.removal_reason not in valid_reasons:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid removal_reason. Must be one of: {', '.join(sorted(valid_reasons))}",
+        )
+
+    actual_end = date.today()
+    if body.actual_end_date:
+        actual_end = body.actual_end_date
+
+    if actual_end < planting.start_date:
+        raise HTTPException(
+            status_code=400,
+            detail="actual_end_date must be on or after start_date",
+        )
+
+    planting.end_date = actual_end
+    planting.status = "complete"
+    planting.removal_reason = body.removal_reason
+    await db.commit()
+    await db.refresh(planting)
+
+    loaded = await _load_planting_with_relations(db, planting.id)
+    return _planting_to_response(loaded)
 
 
 # --- Delete planting ---

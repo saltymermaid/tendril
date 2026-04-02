@@ -1824,3 +1824,179 @@ select.input {
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== Lifecycle Phase Display ===== */
+
+.lifecycle-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.lifecycle-card.planned {
+  border-left: 4px solid var(--text-muted);
+}
+
+.lifecycle-card.complete {
+  border-left: 4px solid var(--success);
+}
+
+.lifecycle-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.lifecycle-phase-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.lifecycle-info {
+  flex: 1;
+}
+
+.lifecycle-phase-name {
+  font-weight: 600;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+
+.lifecycle-day-count {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 0.125rem;
+}
+
+.lifecycle-progress-bar {
+  margin-top: 0.5rem;
+}
+
+.lifecycle-progress-track {
+  width: 100%;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.lifecycle-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.lifecycle-progress-fill.germination {
+  background: linear-gradient(90deg, #68D391, #48BB78);
+}
+
+.lifecycle-progress-fill.growing {
+  background: linear-gradient(90deg, #48BB78, #38A169);
+}
+
+.lifecycle-progress-fill.harvesting {
+  background: linear-gradient(90deg, #ECC94B, #D69E2E);
+}
+
+.lifecycle-progress-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: 0.375rem;
+  text-align: right;
+}
+
+.lifecycle-phase-progress {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+/* ===== Removal Reason Modal ===== */
+
+.removal-reason-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.removal-reason-btn {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.removal-reason-btn:hover {
+  border-color: var(--primary);
+  background: var(--surface-hover);
+}
+
+.removal-reason-btn.selected {
+  border-color: var(--primary);
+  background: rgba(56, 161, 105, 0.08);
+  font-weight: 600;
+}
+
+/* ===== Page Header Actions ===== */
+
+.page-header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: var(--text-sm);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-danger:hover {
+  opacity: 0.9;
+}
+
+.back-link {
+  display: inline-block;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  margin-bottom: 0.5rem;
+}
+
+.back-link:hover {
+  color: var(--primary);
+}
+
+.page-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.planting-color-dot.inline {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}

@@ -32,6 +32,29 @@ class PlantingUpdate(BaseModel):
     removal_reason: str | None = None
 
 
+class ActivatePlanting(BaseModel):
+    """Request body for activating a planting (Not Started → In Progress)."""
+    actual_start_date: date | None = None  # Defaults to today if not provided
+
+
+class CompletePlanting(BaseModel):
+    """Request body for completing a planting (In Progress → Complete)."""
+    removal_reason: str  # harvest_complete, died, pulled_early, pest_disease, other
+    actual_end_date: date | None = None  # Defaults to today if not provided
+    notes: str | None = None
+
+
+class LifecyclePhaseResponse(BaseModel):
+    """Computed lifecycle phase information."""
+    phase: str  # germination, growing, harvesting, not_started, complete
+    phase_display: str  # Human-readable label
+    day_number: int
+    total_days: int
+    phase_day: int
+    phase_total_days: int
+    progress_percent: float
+
+
 class PlantingResponse(BaseModel):
     id: int
     user_id: int
@@ -54,5 +77,8 @@ class PlantingResponse(BaseModel):
     category_name: str | None = None
     category_color: str | None = None
     container_name: str | None = None
+
+    # Lifecycle phase (computed)
+    lifecycle: LifecyclePhaseResponse | None = None
 
     model_config = {"from_attributes": True}

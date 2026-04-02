@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 
+interface LifecyclePhase {
+  phase: string
+  phase_display: string
+  day_number: number
+  total_days: number
+  phase_day: number
+  phase_total_days: number
+  progress_percent: number
+}
+
 interface PlantingDetail {
   id: number
   user_id: number
@@ -21,9 +31,18 @@ interface PlantingDetail {
   category_name: string | null
   category_color: string | null
   container_name: string | null
+  lifecycle: LifecyclePhase | null
 }
 
 const ROW_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+const REMOVAL_REASONS = [
+  { value: 'harvest_complete', label: '🌾 Harvest Complete' },
+  { value: 'died', label: '💀 Died' },
+  { value: 'pulled_early', label: '🔄 Pulled Early' },
+  { value: 'pest_disease', label: '🐛 Pest / Disease' },
+  { value: 'other', label: '📝 Other' },
+]
 
 export function PlantingDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -31,6 +50,9 @@ export function PlantingDetailPage() {
   const [planting, setPlanting] = useState<PlantingDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [showRemoveModal, setShowRemoveModal] = useState(false)
+  const [removalReason, setRemovalReason] = useState('')
+  const [actionLoading, setActionLoading] = useState(false)
 
   useEffect(() => {
     if (id) fetchPlanting()
@@ -62,20 +84,51 @@ export function PlantingDetailPage() {
     }
   }
 
-  async function updateStatus(newStatus: string) {
+  async function handleActivate() {
+    setActionLoading(true)
+    setError('')
     try {
-      const res = await fetch(`/api/plantings/${id}`, {
-        method: 'PUT',
+      const res = await fetch(`/api/plantings/${id}/activate`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({}),
       })
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.detail || 'Failed to update')
+        throw new Error(data.detail || 'Failed to activate')
       }
       setPlanting(await res.json())
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to update status')
+      setError(err instanceof Error ? err.message : 'Failed to activate planting')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function handleComplete() {
+    if (!removalReason) {
+      setError('Please select a removal reason')
+      return
+    }
+    setActionLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/plantings/${id}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ removal_reason: removalReason }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.detail || 'Failed to complete')
+      }
+      setPlanting(await res.json())
+      setShowRemoveModal(false)
+      setRemovalReason('')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to complete planting')
+    } finally {
+      setActionLoading(false)
     }
   }
 
@@ -88,7 +141,7 @@ export function PlantingDetailPage() {
     )
   }
 
-  if (error || !planting) {
+  if (error && !planting) {
     return (
       <div className="catalog-page">
         <div className="form-message error">{error || 'Planting not found'}</div>
@@ -97,6 +150,8 @@ export function PlantingDetailPage() {
     )
   }
 
+  if (!planting) return null
+
   const positionLabel = planting.tower_level !== null
     ? `Level ${planting.tower_level + 1}, Pocket ${planting.square_x + 1}`
     : `${ROW_LABELS[planting.square_y]}${planting.square_x + 1}${
@@ -104,6 +159,8 @@ export function PlantingDetailPage() {
           ? ` (${planting.square_width}×${planting.square_height})`
           : ''
       }`
+
+  const lifecycle = planting.lifecycle
 
   return (
     <div className="catalog-page">
@@ -126,30 +183,95 @@ export function PlantingDetailPage() {
           </div>
           <div className="page-header-actions">
             {planting.status === 'not_started' && (
-              <button
-                onClick={() => updateStatus('in_progress')}
-                className="btn btn-primary btn-sm"
-              >
-                ▶ Start Growing
-              </button>
+              <>
+                <button
+                  onClick={handleActivate}
+                  className="btn btn-primary btn-sm"
+                  disabled={actionLoading}
+                >
+                  🌱 Plant Now
+                </button>
+                <button onClick={handleDelete} className="btn btn-danger btn-sm">
+                  Delete
+                </button>
+              </>
             )}
             {planting.status === 'in_progress' && (
               <button
-                onClick={() => updateStatus('complete')}
+                onClick={() => setShowRemoveModal(true)}
                 className="btn btn-primary btn-sm"
               >
-                ✓ Mark Complete
-              </button>
-            )}
-            {planting.status === 'not_started' && (
-              <button onClick={handleDelete} className="btn btn-danger btn-sm">
-                Delete
+                ✓ Remove / Complete
               </button>
             )}
           </div>
         </div>
       </div>
 
+      {/* Lifecycle Phase Display */}
+      {lifecycle && planting.status === 'in_progress' && (
+        <div className="lifecycle-card">
+          <div className="lifecycle-header">
+            <span className={`lifecycle-phase-icon ${lifecycle.phase}`}>
+              {lifecycle.phase === 'germination' && '🌱'}
+              {lifecycle.phase === 'growing' && '🌿'}
+              {lifecycle.phase === 'harvesting' && '🌾'}
+            </span>
+            <div className="lifecycle-info">
+              <div className="lifecycle-phase-name">{lifecycle.phase_display}</div>
+              <div className="lifecycle-day-count">
+                Day {lifecycle.day_number + 1} of {lifecycle.total_days}
+              </div>
+            </div>
+          </div>
+          <div className="lifecycle-progress-bar">
+            <div className="lifecycle-progress-track">
+              <div
+                className={`lifecycle-progress-fill ${lifecycle.phase}`}
+                style={{ width: `${lifecycle.progress_percent}%` }}
+              />
+            </div>
+            <div className="lifecycle-progress-label">
+              {Math.round(lifecycle.progress_percent)}% complete
+            </div>
+          </div>
+          {lifecycle.phase_total_days > 0 && (
+            <div className="lifecycle-phase-progress">
+              Phase progress: Day {lifecycle.phase_day + 1} of {lifecycle.phase_total_days}
+            </div>
+          )}
+        </div>
+      )}
+
+      {lifecycle && planting.status === 'not_started' && (
+        <div className="lifecycle-card planned">
+          <div className="lifecycle-header">
+            <span className="lifecycle-phase-icon not_started">📋</span>
+            <div className="lifecycle-info">
+              <div className="lifecycle-phase-name">Planned</div>
+              <div className="lifecycle-day-count">
+                Starts {planting.start_date} · {lifecycle.total_days} days planned
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {lifecycle && planting.status === 'complete' && (
+        <div className="lifecycle-card complete">
+          <div className="lifecycle-header">
+            <span className="lifecycle-phase-icon complete">✅</span>
+            <div className="lifecycle-info">
+              <div className="lifecycle-phase-name">Complete</div>
+              <div className="lifecycle-day-count">
+                {planting.start_date} → {planting.end_date} · {lifecycle.total_days} days
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info Grid */}
       <div className="container-info-grid">
         <div className="container-info-item">
           <div className="info-label">Status</div>
@@ -175,6 +297,10 @@ export function PlantingDetailPage() {
             </Link>
           </div>
         </div>
+        <div className="container-info-item">
+          <div className="info-label">Position</div>
+          <div className="info-value">{positionLabel}</div>
+        </div>
         {planting.planting_method && (
           <div className="container-info-item">
             <div className="info-label">Method</div>
@@ -190,12 +316,58 @@ export function PlantingDetailPage() {
         {planting.removal_reason && (
           <div className="container-info-item">
             <div className="info-label">Removal Reason</div>
-            <div className="info-value">{planting.removal_reason.replace('_', ' ')}</div>
+            <div className="info-value">
+              {REMOVAL_REASONS.find(r => r.value === planting.removal_reason)?.label
+                || planting.removal_reason.replace('_', ' ')}
+            </div>
           </div>
         )}
       </div>
 
       {error && <div className="form-message error">{error}</div>}
+
+      {/* Remove / Complete Modal */}
+      {showRemoveModal && (
+        <div className="modal-overlay" onClick={() => setShowRemoveModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Remove Planting</h3>
+              <button className="modal-close" onClick={() => setShowRemoveModal(false)}>×</button>
+            </div>
+            <div className="planting-detail-body">
+              <p className="text-muted" style={{ marginBottom: '1rem' }}>
+                Why is this planting being removed?
+              </p>
+              <div className="removal-reason-list">
+                {REMOVAL_REASONS.map(reason => (
+                  <button
+                    key={reason.value}
+                    className={`removal-reason-btn ${removalReason === reason.value ? 'selected' : ''}`}
+                    onClick={() => setRemovalReason(reason.value)}
+                  >
+                    {reason.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button
+                onClick={handleComplete}
+                className="btn btn-primary"
+                disabled={!removalReason || actionLoading}
+              >
+                {actionLoading ? 'Completing...' : 'Complete Planting'}
+              </button>
+              <button
+                onClick={() => setShowRemoveModal(false)}
+                className="btn btn-outline-dark"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
