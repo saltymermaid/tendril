@@ -24,6 +24,7 @@ export interface TimelinePlanting {
   variety_name: string | null
   category_name: string | null
   category_color: string | null
+  category_icon_svg: string | null
   start_date: string
   end_date: string
   germination_end: string
@@ -47,6 +48,13 @@ const HEADER_HEIGHT = 48
 const LEFT_LABEL_WIDTH = 180
 const DAY_WIDTH = 4 // pixels per day
 const GROUP_HEADER_HEIGHT = 28
+
+function statusLabel(status: string): string {
+  if (status === 'not_started') return 'Planned'
+  if (status === 'in_progress') return 'Growing'
+  if (status === 'complete') return 'Done'
+  return status
+}
 
 function parseDate(s: string): Date {
   const [y, m, d] = s.split('-').map(Number)
@@ -221,6 +229,7 @@ export function GanttChart({ plantings, startDate, endDate, groupBy }: GanttChar
         style={{ cursor: 'pointer' }}
         onClick={() => navigate(`/plantings/${p.id}`)}
       >
+        <title>{statusLabel(p.status)} · {p.variety_name ?? 'Unknown'} · {p.start_date} – {p.end_date}</title>
         {/* Row background */}
         <rect
           x={0}
@@ -229,14 +238,31 @@ export function GanttChart({ plantings, startDate, endDate, groupBy }: GanttChar
           height={ROW_HEIGHT}
           fill={rowBg}
         />
+        {/* Category icon */}
+        {p.category_icon_svg && (
+          <foreignObject
+            x={8}
+            y={currentY + ROW_HEIGHT / 2 - 8}
+            width={16}
+            height={16}
+          >
+            <div
+              style={{ width: 16, height: 16, overflow: 'hidden', lineHeight: '16px' }}
+              dangerouslySetInnerHTML={{ __html: p.category_icon_svg }}
+            />
+          </foreignObject>
+        )}
         {/* Label */}
         <text
-          x={8}
+          x={p.category_icon_svg ? 28 : 8}
           y={currentY + ROW_HEIGHT / 2 + 4}
           fontSize="11"
           fill="var(--color-text-secondary)"
         >
-          {row.label.length > 22 ? row.label.slice(0, 20) + '…' : row.label}
+          {(() => {
+            const maxChars = p.category_icon_svg ? 18 : 22
+            return row.label.length > maxChars ? row.label.slice(0, maxChars - 2) + '…' : row.label
+          })()}
         </text>
         {/* Bar outline */}
         <rect

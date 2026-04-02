@@ -305,6 +305,7 @@ async def get_timeline(
             "variety_name": variety.name if variety else None,
             "category_name": variety.category.name if variety and variety.category else None,
             "category_color": variety.category.color if variety and variety.category else None,
+            "category_icon_svg": variety.category.icon_svg if variety and variety.category else None,
             "start_date": p.start_date.isoformat(),
             "end_date": p.end_date.isoformat(),
             "germination_end": germination_end,
