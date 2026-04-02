@@ -8,7 +8,9 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import get_settings
 from app.routers.auth import router as auth_router
+from app.routers.categories import router as categories_router
 from app.routers.settings import router as settings_router
+from app.routers.varieties import router as varieties_router
 
 
 @asynccontextmanager
@@ -42,7 +44,9 @@ app.add_middleware(
 
 # Routers
 app.include_router(auth_router)
+app.include_router(categories_router)
 app.include_router(settings_router)
+app.include_router(varieties_router)
 
 
 @app.get("/api/health")

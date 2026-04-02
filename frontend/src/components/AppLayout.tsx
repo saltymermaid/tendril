@@ -13,6 +13,7 @@ export function AppLayout() {
         </div>
         <nav className="header-nav">
           <NavLink to="/" className="nav-link" end>Dashboard</NavLink>
+          <NavLink to="/catalog" className="nav-link">Catalog</NavLink>
           <NavLink to="/settings" className="nav-link">Settings</NavLink>
         </nav>
         <div className="header-right">

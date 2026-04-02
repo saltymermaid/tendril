@@ -5,6 +5,11 @@ import { AppLayout } from '@/components/AppLayout'
 import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { SettingsPage } from '@/pages/SettingsPage'
+import { CatalogPage } from '@/pages/CatalogPage'
+import { CategoryDetailPage } from '@/pages/CategoryDetailPage'
+import { CategoryFormPage } from '@/pages/CategoryFormPage'
+import { VarietyDetailPage } from '@/pages/VarietyDetailPage'
+import { VarietyFormPage } from '@/pages/VarietyFormPage'
 
 function App() {
   return (
@@ -21,6 +26,13 @@ function App() {
           >
             <Route path="/" element={<DashboardPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/catalog" element={<CatalogPage />} />
+            <Route path="/catalog/categories/new" element={<CategoryFormPage />} />
+            <Route path="/catalog/categories/:id" element={<CategoryDetailPage />} />
+            <Route path="/catalog/categories/:id/edit" element={<CategoryFormPage />} />
+            <Route path="/catalog/varieties/new" element={<VarietyFormPage />} />
+            <Route path="/catalog/varieties/:id" element={<VarietyDetailPage />} />
+            <Route path="/catalog/varieties/:id/edit" element={<VarietyFormPage />} />
           </Route>
         </Routes>
       </AuthProvider>
