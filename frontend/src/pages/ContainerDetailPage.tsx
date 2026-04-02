@@ -58,6 +58,35 @@ interface Category {
   color: string
 }
 
+interface RecommendationVariety {
+  variety_id: number
+  variety_name: string
+  score: number
+  days_to_harvest_min: number | null
+  days_to_harvest_max: number | null
+  planting_method: string
+  is_climbing: boolean
+  spacing: string
+  warnings: string[]
+  boosts: string[]
+}
+
+interface RecommendationCategory {
+  category_id: number
+  category_name: string
+  category_color: string
+  varieties: RecommendationVariety[]
+}
+
+interface RecommendationData {
+  date: string
+  container_id: number
+  square_x: number
+  square_y: number
+  total_varieties: number
+  categories: RecommendationCategory[]
+}
+
 const SUPPORT_ICONS: Record<string, string> = {
   trellis: '🪜',
   cage: '🔲',
@@ -108,6 +137,14 @@ export function ContainerDetailPage() {
 
   // Selected planting for detail view
   const [selectedPlanting, setSelectedPlanting] = useState<PlantingData | null>(null)
+
+  // Recommendation state
+  const [recommendations, setRecommendations] = useState<RecommendationData | null>(null)
+  const [recLoading, setRecLoading] = useState(false)
+  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
+
+  // Square action chooser (plant vs recommend)
+  const [squareChooser, setSquareChooser] = useState<{ x: number; y: number; towerLevel?: number } | null>(null)
 
   const fetchContainer = useCallback(async () => {
     try {
@@ -308,13 +345,40 @@ export function ContainerDetailPage() {
     return matchesSearch && matchesCategory
   })
 
+  async function fetchRecommendations(x: number, y: number) {
+    setRecLoading(true)
+    setRecommendations(null)
+    setExpandedCategories(new Set())
+    try {
+      const res = await fetch(
+        `/api/recommendations?container_id=${id}&square_x=${x}&square_y=${y}&date=${selectedDate}`
+      )
+      if (!res.ok) throw new Error('Failed to load recommendations')
+      setRecommendations(await res.json())
+    } catch {
+      setRecommendations(null)
+    } finally {
+      setRecLoading(false)
+    }
+  }
+
+  function toggleCategory(catId: number) {
+    setExpandedCategories(prev => {
+      const next = new Set(prev)
+      if (next.has(catId)) next.delete(catId)
+      else next.add(catId)
+      return next
+    })
+  }
+
   function handleSquareClick(x: number, y: number) {
     const planting = getPlantingAt(x, y)
     if (planting) {
       setSelectedPlanting(planting)
       setSupportMenu(null)
     } else {
-      openPlantingModal(x, y)
+      setSquareChooser({ x, y })
+      setSupportMenu(null)
     }
   }
 
@@ -536,7 +600,7 @@ export function ContainerDetailPage() {
                           if (planting) {
                             setSelectedPlanting(planting)
                           } else {
-                            openPlantingModal(pocket, 0, level)
+                            setSquareChooser({ x: pocket, y: 0, towerLevel: level })
                           }
                         }}
                         title={planting ? planting.variety_name || '' : `Pocket ${pocket + 1}`}
@@ -825,6 +889,152 @@ export function ContainerDetailPage() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Square Action Chooser Modal */}
+      {squareChooser && (
+        <div className="modal-overlay" onClick={() => setSquareChooser(null)}>
+          <div className="modal-content modal-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>
+                {squareChooser.towerLevel !== undefined
+                  ? `Level ${squareChooser.towerLevel + 1}, Pocket ${squareChooser.x + 1}`
+                  : `${ROW_LABELS[squareChooser.y]}${squareChooser.x + 1}`}
+              </h3>
+              <button className="modal-close" onClick={() => setSquareChooser(null)}>✕</button>
+            </div>
+            <div className="square-chooser-actions">
+              <button
+                className="square-chooser-btn"
+                onClick={() => {
+                  const { x, y, towerLevel } = squareChooser
+                  setSquareChooser(null)
+                  openPlantingModal(x, y, towerLevel)
+                }}
+              >
+                <span className="chooser-icon">🌱</span>
+                <span className="chooser-label">Plant Something</span>
+                <span className="chooser-desc">Choose a variety and plant it here</span>
+              </button>
+              <button
+                className="square-chooser-btn"
+                onClick={() => {
+                  const { x, y } = squareChooser
+                  setSquareChooser(null)
+                  fetchRecommendations(x, y)
+                }}
+              >
+                <span className="chooser-icon">💡</span>
+                <span className="chooser-label">What Can I Plant Here?</span>
+                <span className="chooser-desc">Get recommendations based on season & companions</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recommendation Results Modal */}
+      {(recommendations || recLoading) && (
+        <div className="modal-overlay" onClick={() => { setRecommendations(null); setRecLoading(false) }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>
+                💡 Recommendations —{' '}
+                {recommendations
+                  ? `${ROW_LABELS[recommendations.square_y]}${recommendations.square_x + 1}`
+                  : '...'}
+              </h3>
+              <button className="modal-close" onClick={() => { setRecommendations(null); setRecLoading(false) }}>✕</button>
+            </div>
+
+            {recLoading && (
+              <div style={{ padding: '2rem', textAlign: 'center' }}>
+                <span className="tendril-icon">🌱</span>
+                <p>Finding recommendations...</p>
+              </div>
+            )}
+
+            {recommendations && recommendations.total_varieties === 0 && (
+              <div style={{ padding: '2rem', textAlign: 'center' }}>
+                <span style={{ fontSize: '2rem' }}>🤷</span>
+                <p>No varieties match this square right now.</p>
+                <p className="text-muted">Try a different date or add more varieties to your catalog.</p>
+              </div>
+            )}
+
+            {recommendations && recommendations.total_varieties > 0 && (
+              <div className="rec-results">
+                <p className="text-muted" style={{ marginBottom: 'var(--space-3)' }}>
+                  {recommendations.total_varieties} varieties in {recommendations.categories.length} categories
+                </p>
+                {recommendations.categories.map(cat => (
+                  <div key={cat.category_id} className="rec-category">
+                    <button
+                      className="rec-category-header"
+                      onClick={() => toggleCategory(cat.category_id)}
+                    >
+                      <span
+                        className="rec-category-dot"
+                        style={{ backgroundColor: cat.category_color }}
+                      />
+                      <span className="rec-category-name">{cat.category_name}</span>
+                      <span className="rec-category-count">{cat.varieties.length}</span>
+                      <span className="rec-category-arrow">
+                        {expandedCategories.has(cat.category_id) ? '▼' : '▶'}
+                      </span>
+                    </button>
+                    {expandedCategories.has(cat.category_id) && (
+                      <div className="rec-variety-list">
+                        {cat.varieties.map(v => (
+                          <div
+                            key={v.variety_id}
+                            className="rec-variety-item"
+                            onClick={() => {
+                              setRecommendations(null)
+                              setSelectedVariety(v.variety_id)
+                              if (recommendations) {
+                                openPlantingModal(recommendations.square_x, recommendations.square_y)
+                                // Pre-select the variety
+                                setTimeout(() => setSelectedVariety(v.variety_id), 50)
+                              }
+                            }}
+                          >
+                            <div className="rec-variety-header">
+                              <strong>{v.variety_name}</strong>
+                              <span className="rec-score">Score: {v.score}</span>
+                            </div>
+                            <div className="rec-variety-meta">
+                              {v.days_to_harvest_min && (
+                                <span>🕐 {v.days_to_harvest_min}–{v.days_to_harvest_max || '?'} days</span>
+                              )}
+                              <span>📐 {v.spacing}</span>
+                              {v.is_climbing && <span>🧗 Climbing</span>}
+                              <span>🌱 {v.planting_method.replace('_', ' ')}</span>
+                            </div>
+                            {v.boosts.length > 0 && (
+                              <div className="rec-boosts">
+                                {v.boosts.map((b, i) => (
+                                  <span key={i} className="rec-boost">✅ {b}</span>
+                                ))}
+                              </div>
+                            )}
+                            {v.warnings.length > 0 && (
+                              <div className="rec-warnings">
+                                {v.warnings.map((w, i) => (
+                                  <span key={i} className="rec-warning">⚠️ {w}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
