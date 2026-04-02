@@ -10,6 +10,9 @@ import { CategoryDetailPage } from '@/pages/CategoryDetailPage'
 import { CategoryFormPage } from '@/pages/CategoryFormPage'
 import { VarietyDetailPage } from '@/pages/VarietyDetailPage'
 import { VarietyFormPage } from '@/pages/VarietyFormPage'
+import { ContainersPage } from '@/pages/ContainersPage'
+import { ContainerDetailPage } from '@/pages/ContainerDetailPage'
+import { ContainerFormPage } from '@/pages/ContainerFormPage'
 
 function App() {
   return (
@@ -33,6 +36,10 @@ function App() {
             <Route path="/catalog/varieties/new" element={<VarietyFormPage />} />
             <Route path="/catalog/varieties/:id" element={<VarietyDetailPage />} />
             <Route path="/catalog/varieties/:id/edit" element={<VarietyFormPage />} />
+            <Route path="/containers" element={<ContainersPage />} />
+            <Route path="/containers/new" element={<ContainerFormPage />} />
+            <Route path="/containers/:id" element={<ContainerDetailPage />} />
+            <Route path="/containers/:id/edit" element={<ContainerFormPage />} />
           </Route>
         </Routes>
       </AuthProvider>
