@@ -1,6 +1,7 @@
 """Alembic environment configuration for async SQLAlchemy."""
 
 import asyncio
+import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -12,6 +13,10 @@ from app.database import Base
 
 # Alembic Config object
 config = context.config
+
+# Override sqlalchemy.url from DATABASE_URL env var when present (e.g. CI)
+if os.environ.get("DATABASE_URL"):
+    config.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
 
 # Set up logging
 if config.config_file_name is not None:
