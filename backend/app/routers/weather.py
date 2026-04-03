@@ -29,6 +29,7 @@ class DayForecastResponse(BaseModel):
 class WeatherResponse(BaseModel):
     forecast: list[DayForecastResponse]
     location_configured: bool
+    city_name: str | None = None
 
 
 @router.get("", response_model=WeatherResponse)
@@ -39,6 +40,7 @@ async def get_weather(
     settings = current_user.settings or {}
     lat = settings.get("weather_lat")
     lon = settings.get("weather_lon")
+    city_name = settings.get("weather_city") or None
     location_configured = lat is not None and lon is not None
 
     try:
@@ -59,6 +61,7 @@ async def get_weather(
                 for f in forecasts
             ],
             location_configured=location_configured,
+            city_name=city_name,
         )
     except Exception as e:
         logger.error(f"Weather API error: {e}")

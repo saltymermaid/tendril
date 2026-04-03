@@ -1,6 +1,6 @@
 import { apiFetch } from "../lib/api"
 import { useEffect, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { WeatherWidget } from '@/components/WeatherWidget'
 import { NotificationPrompt } from '@/components/NotificationPrompt'
@@ -43,6 +43,7 @@ function formatDate(dateStr: string): string {
 
 export function DashboardPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [tasks, setTasks] = useState<TaskData[]>([])
   const [containers, setContainers] = useState<ContainerOverview[]>([])
   const [loading, setLoading] = useState(true)
@@ -128,48 +129,21 @@ export function DashboardPage() {
         </p>
       </div>
 
-      {/* Quick Stats */}
+      {/* Quick Stats — clickable cards */}
       <div className="dashboard-stats">
-        <div className="stat-card">
+        <button className="stat-card stat-card-btn" onClick={() => navigate('/containers')}>
           <div className="stat-value">{totalContainers}</div>
           <div className="stat-label">Containers</div>
-        </div>
-        <div className="stat-card">
+          <div className="stat-sub">{plantedSlots}/{totalSlots} slots used</div>
+        </button>
+        <button className="stat-card stat-card-btn" onClick={() => navigate('/timeline')}>
           <div className="stat-value">{totalPlantings}</div>
           <div className="stat-label">Active Plantings</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">
-            {plantedSlots}/{totalSlots}
-          </div>
-          <div className="stat-label">Slots Used</div>
-        </div>
-        <div className="stat-card">
+        </button>
+        <button className="stat-card stat-card-btn" onClick={() => navigate('/tasks')}>
           <div className="stat-value">{tasks.length}</div>
           <div className="stat-label">Pending Tasks</div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="dashboard-actions">
-        <Link to="/containers" className="quick-action-btn">
-          📦 Containers
-        </Link>
-        <Link to="/catalog/varieties/new" className="quick-action-btn">
-          🌱 Add Variety
-        </Link>
-        <Link to="/overview" className="quick-action-btn">
-          🗺️ Garden Overview
-        </Link>
-        <Link to="/timeline" className="quick-action-btn">
-          📊 Timeline
-        </Link>
-        <Link to="/tasks" className="quick-action-btn">
-          ✅ All Tasks
-        </Link>
-        <Link to="/catalog" className="quick-action-btn">
-          📚 Catalog
-        </Link>
+        </button>
       </div>
 
       {/* Main Content Grid */}

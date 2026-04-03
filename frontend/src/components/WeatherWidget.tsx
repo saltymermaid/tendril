@@ -16,6 +16,7 @@ interface DayForecast {
 interface WeatherData {
   forecast: DayForecast[]
   location_configured: boolean
+  city_name: string | null
 }
 
 function formatDayName(dateStr: string, index: number): string {
@@ -81,7 +82,12 @@ export function WeatherWidget() {
   return (
     <div className="weather-widget">
       <div className="weather-header">
-        <h3>🌤️ 7-Day Forecast</h3>
+        <div className="weather-header-title">
+          <h3>🌤️ 7-Day Forecast</h3>
+          {weather.city_name && (
+            <span className="weather-city-name">📍 {weather.city_name}</span>
+          )}
+        </div>
         {!weather.location_configured && (
           <Link to="/settings" className="weather-config-link">
             📍 Set location

@@ -41,8 +41,8 @@ WMO_CODES: dict[int, tuple[str, str]] = {
 DEFAULT_LAT = 27.7676
 DEFAULT_LON = -82.6403
 
-# Cache TTL: 1 hour
-CACHE_TTL_SECONDS = 3600
+# Cache TTL: 4 hours (Open-Meteo free tier allows <10 requests/day)
+CACHE_TTL_SECONDS = 14400
 
 
 @dataclass
