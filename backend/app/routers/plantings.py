@@ -55,6 +55,7 @@ def _planting_to_response(p: Planting) -> PlantingResponse:
     variety_name = None
     category_name = None
     category_color = None
+    category_icon_svg = None
     container_name = None
 
     if p.variety:
@@ -62,6 +63,7 @@ def _planting_to_response(p: Planting) -> PlantingResponse:
         if p.variety.category:
             category_name = p.variety.category.name
             category_color = p.variety.category.color
+            category_icon_svg = p.variety.category.icon_svg
 
     if p.container:
         container_name = p.container.name
@@ -85,6 +87,7 @@ def _planting_to_response(p: Planting) -> PlantingResponse:
         variety_name=variety_name,
         category_name=category_name,
         category_color=category_color,
+        category_icon_svg=category_icon_svg,
         container_name=container_name,
         lifecycle=_compute_lifecycle(p),
     )

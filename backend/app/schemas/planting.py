@@ -76,6 +76,7 @@ class PlantingResponse(BaseModel):
     variety_name: str | None = None
     category_name: str | None = None
     category_color: str | None = None
+    category_icon_svg: str | None = None
     container_name: str | None = None
 
     # Lifecycle phase (computed)

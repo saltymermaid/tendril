@@ -1365,7 +1365,7 @@ select.form-input {
 }
 
 .grid-bed-wrapper {
-  display: inline-block;
+  display: block;
   background: var(--color-earth-100);
   border: 2px solid var(--color-earth-300);
   border-radius: var(--radius-md);
@@ -1402,9 +1402,10 @@ select.form-input {
   font-size: var(--text-xs);
   font-weight: 600;
   color: var(--color-text-secondary);
-  width: 48px;
+  flex: 0 0 calc((100% - 28px - 5 * 4px) / 5);
+  width:     calc((100% - 28px - 5 * 4px) / 5);
+  min-width: 36px;
   min-height: 28px;
-  flex-shrink: 0;
 }
 
 .grid-col-labels {
@@ -1414,8 +1415,13 @@ select.form-input {
 }
 
 .grid-square {
-  width: 48px;
-  height: 48px;
+  /* Size: fill 1/5 of wrapper width. Corner label=28px, gaps=5×4px=20px total */
+  flex: 0 0 calc((100% - 28px - 5 * 4px) / 5);
+  width:           calc((100% - 28px - 5 * 4px) / 5);
+  aspect-ratio: 1;
+  height: unset;
+  min-width: 36px;
+  min-height: 36px;
   background: var(--color-earth-50);
   border: 2px solid var(--color-earth-200);
   border-radius: var(--radius-sm);
@@ -1426,6 +1432,7 @@ select.form-input {
   font-size: var(--text-lg);
   transition: border-color 0.15s, background 0.15s;
   position: relative;
+  overflow: visible;
 }
 
 .grid-square:hover {
@@ -1453,14 +1460,15 @@ select.form-input {
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 20;
-  background: var(--color-surface);
+  z-index: 200;
+  background: #ffffff;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   padding: var(--space-2);
   min-width: 140px;
   margin-top: var(--space-1);
+  opacity: 1;
 }
 
 .support-menu button {
@@ -1646,16 +1654,56 @@ select.form-input {
   opacity: 0.5;
 }
 
-.grid-square .square-variety-name {
-  font-size: 9px;
-  font-weight: 600;
-  color: var(--color-text);
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-  max-width: 100%;
-  line-height: 1.1;
+/* Category icon inside grid square */
+.grid-square .square-category-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
+
+.grid-square .square-category-icon svg {
+  width: 55%;
+  height: 55%;
+  overflow: visible;
+}
+
+/* Multi-square planting: show merged outer border, suppress inner borders */
+.grid-square.is-multi-sq {
+  border-color: transparent;
+}
+
+.grid-square.is-multi-sq.multi-edge-top {
+  border-top-color: var(--group-color, var(--color-primary));
+  border-top-width: 3px;
+  border-top-style: solid;
+}
+
+.grid-square.is-multi-sq.multi-edge-bottom {
+  border-bottom-color: var(--group-color, var(--color-primary));
+  border-bottom-width: 3px;
+  border-bottom-style: solid;
+}
+
+.grid-square.is-multi-sq.multi-edge-left {
+  border-left-color: var(--group-color, var(--color-primary));
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+
+.grid-square.is-multi-sq.multi-edge-right {
+  border-right-color: var(--group-color, var(--color-primary));
+  border-right-width: 3px;
+  border-right-style: solid;
+}
+
+/* not-started dashes only on outer edges for multi-square */
+.grid-square.is-multi-sq.not-started.multi-edge-top    { border-top-style: dashed; }
+.grid-square.is-multi-sq.not-started.multi-edge-bottom { border-bottom-style: dashed; }
+.grid-square.is-multi-sq.not-started.multi-edge-left   { border-left-style: dashed; }
+.grid-square.is-multi-sq.not-started.multi-edge-right  { border-right-style: dashed; }
 
 /* Tower pocket states */
 .tower-pocket.planted {
@@ -1977,15 +2025,12 @@ select.form-input {
   padding: var(--space-2);
 }
 
-/* Grid bed wrapper improvements */
+/* Grid bed wrapper layout (overrides earlier declaration) */
 .grid-bed-wrapper {
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
   gap: 4px;
-  background: var(--color-earth-100);
-  border: 2px solid var(--color-earth-300);
-  border-radius: var(--radius-md);
-  padding: var(--space-2);
+  width: 100%;
 }
 
 /* Support menu title */
@@ -2037,8 +2082,8 @@ select.form-input {
   }
 
   .grid-square {
-    width: 36px;
-    height: 36px;
+    min-width: 32px;
+    min-height: 32px;
     font-size: var(--text-sm);
   }
 
@@ -4043,13 +4088,9 @@ select.form-input {
   }
 
   .grid-square {
-    width: 32px;
-    height: 32px;
+    min-width: 28px;
+    min-height: 28px;
     font-size: 0.7rem;
-  }
-
-  .grid-square .square-variety-name {
-    font-size: 7px;
   }
 
   .gantt-scroll-container {

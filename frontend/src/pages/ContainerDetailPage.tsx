@@ -43,6 +43,7 @@ interface PlantingData {
   variety_name: string | null
   category_name: string | null
   category_color: string | null
+  category_icon_svg: string | null
 }
 
 interface Variety {
@@ -96,6 +97,15 @@ const SUPPORT_ICONS: Record<string, string> = {
 }
 
 const ROW_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+function statusLabel(status: string): string {
+  switch (status) {
+    case 'not_started': return 'Planned'
+    case 'in_progress': return 'Growing'
+    case 'complete': return 'Done'
+    default: return status.replace(/_/g, ' ')
+  }
+}
 
 export function ContainerDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -282,10 +292,6 @@ export function ContainerDetailPage() {
     return plantings.find((p: PlantingData) => {
       return p.tower_level === level && p.square_x === pocket
     })
-  }
-
-  function isPlantingOrigin(p: PlantingData, x: number, y: number): boolean {
-    return p.square_x === x && p.square_y === y
   }
 
   async function handleActivatePlanting(plantingId: number) {
@@ -559,6 +565,7 @@ export function ContainerDetailPage() {
           autoComplete="off"
           data-1p-ignore
           data-lpignore="true"
+          data-form-type="other"
         />
         <button className="time-slider-btn" onClick={() => changeDate(1)} title="Next day">▶</button>
         <button className="time-slider-btn" onClick={() => changeDate(7)} title="Forward 1 week">⏩</button>
@@ -579,7 +586,10 @@ export function ContainerDetailPage() {
           <p className="text-muted" style={{ marginBottom: 'var(--space-3)' }}>
             Click a square to plant. Right-click for support structures.
           </p>
-          <div className="grid-bed-wrapper">
+          <div
+            className="grid-bed-wrapper"
+            style={{ '--grid-cols': container.width || 5 } as React.CSSProperties}
+          >
             <div className="grid-header-row">
               <div className="grid-corner" />
               {Array.from({ length: container.width || 0 }).map((_, x) => (
@@ -593,7 +603,13 @@ export function ContainerDetailPage() {
                   const support = getSupportAt(x, y)
                   const planting = getPlantingAt(x, y)
                   const isMenuOpen = supportMenu?.x === x && supportMenu?.y === y
-                  const isOrigin = planting ? isPlantingOrigin(planting, x, y) : false
+                  const isMulti = planting
+                    ? planting.square_width > 1 || planting.square_height > 1
+                    : false
+                  const isEdgeTop    = planting && y === planting.square_y
+                  const isEdgeBottom = planting && y === planting.square_y + planting.square_height - 1
+                  const isEdgeLeft   = planting && x === planting.square_x
+                  const isEdgeRight  = planting && x === planting.square_x + planting.square_width - 1
 
                   return (
                     <div
@@ -606,20 +622,30 @@ export function ContainerDetailPage() {
                         planting?.status === 'in_progress' ? 'in-progress' : '',
                         planting?.status === 'complete' ? 'complete' : '',
                         isMenuOpen ? 'active' : '',
+                        isMulti ? 'is-multi-sq' : '',
+                        isMulti && isEdgeTop    ? 'multi-edge-top'    : '',
+                        isMulti && isEdgeBottom ? 'multi-edge-bottom' : '',
+                        isMulti && isEdgeLeft   ? 'multi-edge-left'   : '',
+                        isMulti && isEdgeRight  ? 'multi-edge-right'  : '',
                       ].filter(Boolean).join(' ')}
-                      style={planting ? { backgroundColor: (planting.category_color || '#86efac') + '40', borderColor: planting.category_color || undefined } : undefined}
+                      style={planting ? {
+                        backgroundColor: (planting.category_color || '#86efac') + '40',
+                        borderColor: planting.category_color || undefined,
+                        '--group-color': planting.category_color || '#86efac',
+                      } as React.CSSProperties : undefined}
                       onClick={() => handleSquareClick(x, y)}
                       onContextMenu={(e) => handleSquareRightClick(e, x, y)}
                       title={
                         planting
-                          ? `${planting.variety_name} (${planting.status})`
+                          ? `${planting.variety_name} · ${statusLabel(planting.status)}`
                           : `${ROW_LABELS[y]}${x + 1}${support ? ` — ${support.support_type}` : ' — empty'}`
                       }
                     >
-                      {planting && isOrigin && (
-                        <span className="square-variety-name">
-                          {planting.variety_name?.substring(0, 6)}
-                        </span>
+                      {planting && planting.category_icon_svg && (
+                        <span
+                          className="square-category-icon"
+                          dangerouslySetInnerHTML={{ __html: planting.category_icon_svg }}
+                        />
                       )}
                       {!planting && support && (
                         <span className="support-icon">{SUPPORT_ICONS[support.support_type] || '🔧'}</span>
@@ -728,7 +754,7 @@ export function ContainerDetailPage() {
                 <div className="planting-list-dates">
                   <span>{p.start_date} → {p.end_date}</span>
                   <span className={`status-badge ${p.status}`}>
-                    {p.status.replace('_', ' ')}
+                    {statusLabel(p.status)}
                   </span>
                 </div>
               </div>
@@ -946,7 +972,7 @@ export function ContainerDetailPage() {
                 <div className="detail-item">
                   <span className="detail-label">Status</span>
                   <span className={`status-badge ${selectedPlanting.status}`}>
-                    {selectedPlanting.status.replace('_', ' ')}
+                    {statusLabel(selectedPlanting.status)}
                   </span>
                 </div>
                 <div className="detail-item">
