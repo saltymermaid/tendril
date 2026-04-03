@@ -3,7 +3,7 @@
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -12,7 +12,6 @@ from app.dependencies import get_current_user
 from app.models.container import Container, SquareSupport
 from app.models.planting import Planting
 from app.models.variety import Variety
-from app.models.category import Category
 from app.models.user import User
 from app.schemas.container import (
     ContainerCreate,

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.category import Category, CompanionRule, PlantingSeason
-from app.models.container import Container, SquareSupport
+from app.models.container import Container
 from app.models.planting import Planting
 from app.models.variety import Variety
 
@@ -326,7 +326,6 @@ async def get_recommendations(
         timing_bonus = min(10, days_remaining_in_window / 30)
         rec.score += timing_bonus
         if timing_bonus > 0:
-            weeks = int(days_remaining_in_window / 7)
             rec.boosts.append(f"{days_remaining_in_window} days remaining in planting window")
 
         results.append(rec)

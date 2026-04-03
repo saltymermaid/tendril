@@ -1,7 +1,7 @@
 """Weather service — fetches 7-day forecast from Open-Meteo API with caching."""
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import httpx
 

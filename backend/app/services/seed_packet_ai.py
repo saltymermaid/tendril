@@ -1,6 +1,5 @@
 """Seed packet photo AI extraction using Claude API."""
 
-import base64
 import json
 import logging
 from dataclasses import dataclass

@@ -11,7 +11,7 @@ Idempotent: only creates tasks if a matching pending task doesn't already exist.
 import logging
 from datetime import date, timedelta
 
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
