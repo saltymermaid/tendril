@@ -1,7 +1,7 @@
 """Recommendation engine — deterministic 'What can I plant here?' logic."""
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -155,6 +155,26 @@ async def get_recommendations(
     )
     active_plantings = planting_result.scalars().all()
 
+    # Find the earliest future planned planting at this square (deadline for harvest)
+    future_result = await db.execute(
+        select(Planting)
+        .where(
+            Planting.container_id == container_id,
+            Planting.user_id == user_id,
+            Planting.start_date > target_date,
+        )
+    )
+    future_plantings = future_result.scalars().all()
+
+    # Filter future plantings to those occupying the target square
+    next_deadline: date | None = None
+    for p in future_plantings:
+        in_x = square_x >= p.square_x and square_x < p.square_x + p.square_width
+        in_y = square_y >= p.square_y and square_y < p.square_y + p.square_height
+        if in_x and in_y:
+            if next_deadline is None or p.start_date < next_deadline:
+                next_deadline = p.start_date
+
     # Get neighbor category IDs (adjacent squares)
     neighbor_category_ids: set[int] = set()
     for p in active_plantings:
@@ -232,19 +252,25 @@ async def get_recommendations(
         if not in_season:
             continue
 
-        # --- Filter 2: Time remaining ---
-        days_remaining = _days_remaining_in_season(
+        # Days remaining in planting window (used for timing bonus in scoring)
+        days_remaining_in_window = _days_remaining_in_season(
             target_date, season_end_month, season_end_day,
             season_start_month, season_start_day,
         )
-        min_days_needed = (variety.days_to_harvest_min or 60)
-        if days_remaining < min_days_needed:
-            continue
 
-        # --- Filter 3: Size compatibility ---
+        # --- Filter 2: Size compatibility ---
         var_w, var_h = _parse_spacing(variety.spacing)
         if var_w > max_width or var_h > max_height:
             continue
+
+        # --- Filter 3: Next planned planting deadline ---
+        # If there is already a future planting scheduled at this square, only
+        # show varieties that can be harvested before it starts.
+        if next_deadline is not None:
+            min_days = variety.days_to_harvest_min or 60
+            earliest_harvest = target_date + timedelta(days=min_days)
+            if earliest_harvest > next_deadline:
+                continue
 
         # --- Scoring ---
         rec = RecommendationResult(
@@ -288,12 +314,20 @@ async def get_recommendations(
                 rec.score -= 10
                 rec.warnings.append("Climbing variety — no support structure present")
         elif support_at_square:
-            # Non-climbing variety with support — slight boost (can still use cage)
-            rec.score += 5
+            # Non-climbing variety — support present but not needed (minor penalty)
+            rec.score -= 5
+            rec.warnings.append(f"Support structure present ({support_at_square}) but not needed")
+        else:
+            # Non-climbing variety with no support — ideal scenario
+            rec.score += 15
+            rec.boosts.append("No support needed — perfect fit for this square")
 
-        # Bonus for more days remaining (better timing)
-        timing_bonus = min(10, (days_remaining - min_days_needed) / 10)
+        # Bonus for more days remaining in the planting window (better timing)
+        timing_bonus = min(10, days_remaining_in_window / 30)
         rec.score += timing_bonus
+        if timing_bonus > 0:
+            weeks = int(days_remaining_in_window / 7)
+            rec.boosts.append(f"{days_remaining_in_window} days remaining in planting window")
 
         results.append(rec)
 

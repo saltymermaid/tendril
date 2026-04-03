@@ -51,6 +51,7 @@ interface Variety {
   category_id: number
   category_name: string | null
   category_color: string | null
+  days_to_harvest_max: number | null
 }
 
 interface Category {
@@ -133,6 +134,18 @@ export function ContainerDetailPage() {
     square_width: 1,
     square_height: 1,
   })
+
+  // Auto-compute end_date when variety or start_date changes
+  useEffect(() => {
+    if (!selectedVariety || !varieties.length) return
+    const variety = varieties.find(v => v.id === selectedVariety)
+    if (!variety?.days_to_harvest_max) return
+    // Parse start_date in local time to avoid UTC offset issues
+    const [yr, mo, dy] = plantingForm.start_date.split('-').map(Number)
+    const end = new Date(yr, mo - 1, dy + variety.days_to_harvest_max)
+    const endDate = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`
+    setPlantingForm(prev => ({ ...prev, end_date: endDate }))
+  }, [selectedVariety, plantingForm.start_date])
   const [plantingError, setPlantingError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -144,6 +157,8 @@ export function ContainerDetailPage() {
   const [recommendations, setRecommendations] = useState<RecommendationData | null>(null)
   const [recLoading, setRecLoading] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
+  const [recSquare, setRecSquare] = useState<{ x: number; y: number; towerLevel?: number } | null>(null)
+  const [recDate, setRecDate] = useState<string>(todayStr)
 
   // Square action chooser (plant vs recommend)
   const [squareChooser, setSquareChooser] = useState<{ x: number; y: number; towerLevel?: number } | null>(null)
@@ -286,14 +301,46 @@ export function ContainerDetailPage() {
     }
   }
 
-  function openPlantingModal(x: number, y: number, towerLevel?: number) {
+  async function openPlantingModal(x: number, y: number, towerLevel?: number) {
     setPlantingModal({ x, y, towerLevel })
     setPlantingError('')
     setSelectedVariety(null)
     setVarietySearch('')
     setSelectedCategory(null)
+
+    // Compute smart default start_date:
+    // If there are existing plantings at this square → day after last end_date
+    // If the square is empty → today
+    let defaultStartDate = new Date().toISOString().split('T')[0]
+    try {
+      const res = await apiFetch(`/api/plantings/by-container/${id}`)
+      if (res.ok) {
+        const allPlantings: PlantingData[] = await res.json()
+        const squarePlantings = allPlantings.filter(p => {
+          if (towerLevel !== undefined) {
+            return p.tower_level === towerLevel && p.square_x === x
+          }
+          const inX = x >= p.square_x && x < p.square_x + p.square_width
+          const inY = y >= p.square_y && y < p.square_y + p.square_height
+          return inX && inY
+        })
+        if (squarePlantings.length > 0) {
+          const maxEndDate = squarePlantings.reduce(
+            (max, p) => (p.end_date > max ? p.end_date : max),
+            squarePlantings[0].end_date
+          )
+          // Start the day after the last planting ends
+          const [yr, mo, dy] = maxEndDate.split('-').map(Number)
+          const next = new Date(yr, mo - 1, dy + 1)
+          defaultStartDate = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
+        }
+      }
+    } catch {
+      // fall back to today
+    }
+
     setPlantingForm({
-      start_date: new Date().toISOString().split('T')[0],
+      start_date: defaultStartDate,
       end_date: '',
       planting_method: '',
       quantity: '',
@@ -360,13 +407,29 @@ export function ContainerDetailPage() {
     return matchesSearch && matchesCategory
   })
 
-  async function fetchRecommendations(x: number, y: number) {
+  function computeNextAvailable(x: number, y: number): string {
+    // Find the latest end_date of any planting occupying this square
+    let maxEnd = todayStr
+    for (const p of plantings) {
+      const inX = x >= p.square_x && x < p.square_x + p.square_width
+      const inY = y >= p.square_y && y < p.square_y + p.square_height
+      if (inX && inY && p.end_date > maxEnd) {
+        maxEnd = p.end_date
+      }
+    }
+    return maxEnd
+  }
+
+  async function fetchRecommendations(x: number, y: number, towerLevel?: number, dateOverride?: string) {
+    const dateToUse = dateOverride ?? computeNextAvailable(x, y)
+    setRecDate(dateToUse)
     setRecLoading(true)
     setRecommendations(null)
     setExpandedCategories(new Set())
+    setRecSquare({ x, y, towerLevel })
     try {
       const res = await apiFetch(
-        `/api/recommendations?container_id=${id}&square_x=${x}&square_y=${y}&date=${selectedDate}`
+        `/api/recommendations?container_id=${id}&square_x=${x}&square_y=${y}&date=${dateToUse}`
       )
       if (!res.ok) throw new Error('Failed to load recommendations')
       setRecommendations(await res.json())
@@ -978,9 +1041,9 @@ export function ContainerDetailPage() {
               <button
                 className="square-chooser-btn"
                 onClick={() => {
-                  const { x, y } = squareChooser
+                  const { x, y, towerLevel } = squareChooser
                   setSquareChooser(null)
-                  fetchRecommendations(x, y)
+                  fetchRecommendations(x, y, towerLevel)
                 }}
               >
                 <span className="chooser-icon">💡</span>
@@ -994,16 +1057,48 @@ export function ContainerDetailPage() {
 
       {/* Recommendation Results Modal */}
       {(recommendations || recLoading) && (
-        <div className="modal-overlay" onClick={() => { setRecommendations(null); setRecLoading(false) }}>
+        <div className="modal-overlay" onClick={() => { setRecommendations(null); setRecLoading(false); setRecSquare(null) }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>
-                💡 Recommendations —{' '}
-                {recommendations
-                  ? `${ROW_LABELS[recommendations.square_y]}${recommendations.square_x + 1}`
-                  : '...'}
-              </h3>
-              <button className="modal-close" onClick={() => { setRecommendations(null); setRecLoading(false) }}>✕</button>
+              <button
+                className="btn btn-outline-dark btn-sm"
+                style={{ marginRight: 'var(--space-2)' }}
+                onClick={() => {
+                  setRecommendations(null)
+                  setRecLoading(false)
+                  if (recSquare) {
+                    setSquareChooser(recSquare)
+                  }
+                  setRecSquare(null)
+                }}
+                title="Back to options"
+              >
+                ← Back
+              </button>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+                <h3 style={{ margin: 0 }}>
+                  💡 Recommendations —{' '}
+                  {recommendations
+                    ? `${ROW_LABELS[recommendations.square_y]}${recommendations.square_x + 1}`
+                    : recSquare
+                      ? (recSquare.towerLevel !== undefined
+                          ? `Level ${recSquare.towerLevel + 1}, Pocket ${recSquare.x + 1}`
+                          : `${ROW_LABELS[recSquare.y]}${recSquare.x + 1}`)
+                      : '...'}
+                </h3>
+                <input
+                  type="date"
+                  className="form-input"
+                  style={{ width: 'auto', fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
+                  value={recDate}
+                  onChange={(e) => {
+                    if (recSquare) {
+                      fetchRecommendations(recSquare.x, recSquare.y, recSquare.towerLevel, e.target.value)
+                    }
+                  }}
+                />
+              </div>
+              <button className="modal-close" onClick={() => { setRecommendations(null); setRecLoading(false); setRecSquare(null) }}>✕</button>
             </div>
 
             {recLoading && (
