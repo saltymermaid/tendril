@@ -255,23 +255,39 @@ button, a, select, input[type="checkbox"], input[type="radio"],
   color: white;
   height: 56px;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-4);
 }
 
 .app-header .header-left {
-  position: absolute;
-  left: var(--space-4);
-  top: 50%;
-  transform: translateY(-50%);
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  flex-shrink: 0;
 }
 
-.app-header .header-right {
-  position: absolute;
-  right: var(--space-4);
-  top: 50%;
-  transform: translateY(-50%);
+/* Wide screens: absolutely position logo + user, center the nav to match .app-main */
+@media (min-width: 1200px) {
+  .app-header {
+    display: block;
+    padding: 0;
+  }
+
+  .app-header .header-left {
+    position: absolute;
+    left: var(--space-4);
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .app-header .header-right {
+    position: absolute;
+    right: var(--space-4);
+    top: 50%;
+    transform: translateY(-50%);
+  }
 }
 
 .app-header .header-left .tendril-icon {
@@ -287,10 +303,6 @@ button, a, select, input[type="checkbox"], input[type="radio"],
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  position: absolute;
-  right: var(--space-4);
-  top: 50%;
-  transform: translateY(-50%);
 }
 
 .app-header .user-name {
@@ -616,6 +628,126 @@ textarea.form-input {
   margin: 0 auto;
   height: 100%;
   padding: 0 var(--space-4);
+}
+
+/* Desktop nav: visible on wide screens, hidden on narrow */
+.header-nav-desktop {
+  display: none;
+}
+
+@media (min-width: 1200px) {
+  .header-nav-desktop {
+    display: flex;
+  }
+}
+
+/* Hamburger button: visible on narrow, hidden on wide */
+.hamburger-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-md);
+  color: white;
+  font-size: 1.25rem;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  line-height: 1;
+  transition: background-color 0.15s ease;
+}
+
+.hamburger-btn:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+@media (min-width: 1200px) {
+  .hamburger-btn {
+    display: none;
+  }
+
+  /* Hide user name on narrow, show on wide */
+  .header-user-name {
+    display: inline;
+  }
+
+  /* Hide logout btn on narrow if hamburger is visible — show it always on wide */
+  .header-logout-btn {
+    display: inline-flex;
+  }
+}
+
+/* On narrow screens, hide user name and logout; show only hamburger */
+@media (max-width: 1199px) {
+  .header-user-name {
+    display: none;
+  }
+
+  .header-logout-btn {
+    display: none;
+  }
+}
+
+/* Mobile menu overlay */
+.mobile-menu-overlay {
+  position: fixed;
+  inset: 56px 0 0 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.mobile-menu {
+  background: linear-gradient(135deg, var(--color-green-800), var(--color-green-700));
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) 0 var(--space-4);
+  box-shadow: var(--shadow-lg);
+}
+
+.mobile-menu-user {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: var(--font-size-sm);
+  padding: var(--space-2) var(--space-5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  margin-bottom: var(--space-2);
+}
+
+.mobile-nav-link {
+  display: block;
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.mobile-nav-link:hover,
+.mobile-nav-link.active {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: white;
+}
+
+.mobile-menu-logout {
+  margin: var(--space-4) var(--space-5) 0;
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-md);
+  color: white;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
+  min-height: 44px;
+}
+
+.mobile-menu-logout:hover {
+  background-color: rgba(255, 255, 255, 0.15);
 }
 
 .nav-link {
