@@ -253,18 +253,25 @@ button, a, select, input[type="checkbox"], input[type="radio"],
 .app-header {
   background: linear-gradient(135deg, var(--color-green-800), var(--color-green-600));
   color: white;
-  padding: 0 var(--space-4);
   height: 56px;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
 }
 
 .app-header .header-left {
+  position: absolute;
+  left: var(--space-4);
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+.app-header .header-right {
+  position: absolute;
+  right: var(--space-4);
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .app-header .header-left .tendril-icon {
@@ -280,6 +287,10 @@ button, a, select, input[type="checkbox"], input[type="radio"],
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  position: absolute;
+  right: var(--space-4);
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .app-header .user-name {
@@ -600,6 +611,11 @@ textarea.form-input {
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+  height: 100%;
+  padding: 0 var(--space-4);
 }
 
 .nav-link {
