@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.config import get_settings
 from app.routers.auth import router as auth_router
@@ -37,6 +38,9 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# Trust proxy headers from nginx (required for https:// redirect URIs behind Cloudflare Tunnel)
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 # Session middleware (required for OAuth state parameter)
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
