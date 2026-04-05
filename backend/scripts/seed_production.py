@@ -15,6 +15,7 @@ Run with:
 """
 
 import asyncio
+import os
 from datetime import date
 
 from app.database import async_session
@@ -24,12 +25,20 @@ from scripts.seed_reference import seed_reference
 
 async def seed_database():
     """Seed the production database with reference data and real garden state."""
+    # Read the primary allowed email from the environment variable.
+    # ALLOWED_EMAILS is set in docker-compose.prod.yml from the .env file.
+    allowed_emails_raw = os.environ.get("ALLOWED_EMAILS", "")
+    owner_email = allowed_emails_raw.split(",")[0].strip() if allowed_emails_raw else "admin@tendril.garden"
+    owner_name = owner_email.split("@")[0].replace(".", " ").title()
+
+    print(f"Seeding reference data for owner: {owner_email}")
+
     async with async_session() as session:
         print("Seeding reference data...")
         user, cat_map, var_map = await seed_reference(
             session,
-            email="dev@tendril.garden",
-            name="Dev User",
+            email=owner_email,
+            name=owner_name,
         )
 
         # ── Containers ────────────────────────────────────────────────────────

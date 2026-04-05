@@ -14,7 +14,7 @@ RUN npm run build
 # ── Stage 2: Production (nginx) ────────────────────────────────
 FROM nginx:1.27-alpine
 
-LABEL org.opencontainers.image.source="https://github.com/melissablades/tendril"
+LABEL org.opencontainers.image.source="https://github.com/saltymermaid/tendril"
 LABEL org.opencontainers.image.description="Tendril Frontend — React SPA served by nginx"
 
 # Remove default nginx config

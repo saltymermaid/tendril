@@ -39,8 +39,8 @@ docker compose -f docker-compose.prod.yml up -d db
 # Run database migrations
 docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
 
-# Seed initial data (categories, planting seasons, companion rules)
-docker compose -f docker-compose.prod.yml run --rm backend python -m scripts.seed_data
+# Seed initial data — run ONCE on first deployment
+docker compose -f docker-compose.prod.yml run --rm backend python -m scripts.seed_production
 
 # Start all services
 docker compose -f docker-compose.prod.yml up -d

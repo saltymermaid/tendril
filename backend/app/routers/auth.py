@@ -48,11 +48,14 @@ def _set_auth_cookies(response: Response, user_id: int, session_timeout_hours: i
     else:
         refresh_max_age = settings.refresh_token_expire_days * 86400
 
+    # secure=True in production (HTTPS via Cloudflare Tunnel); False only in local dev
+    secure = not settings.debug
+
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=False,  # Set True in production with HTTPS
+        secure=secure,
         samesite="lax",
         max_age=settings.access_token_expire_minutes * 60,
         path="/",
@@ -61,7 +64,7 @@ def _set_auth_cookies(response: Response, user_id: int, session_timeout_hours: i
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=False,  # Set True in production with HTTPS
+        secure=secure,
         samesite="lax",
         max_age=refresh_max_age,
         path="/api/auth",  # Only sent to auth endpoints

@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 # ── Stage 2: Production ────────────────────────────────────────
 FROM python:3.12-slim
 
-LABEL org.opencontainers.image.source="https://github.com/melissablades/tendril"
+LABEL org.opencontainers.image.source="https://github.com/saltymermaid/tendril"
 LABEL org.opencontainers.image.description="Tendril API — FastAPI backend"
 
 # Create non-root user
@@ -36,7 +36,8 @@ COPY --from=builder /install /usr/local
 COPY . .
 
 # Remove dev/test files from production image
-RUN rm -rf app/tests/ scripts/ .env* *.md
+# Note: scripts/ is kept because seed_production.py is needed for first-time setup
+RUN rm -rf app/tests/ .env* *.md
 
 # Change ownership
 RUN chown -R tendril:tendril /app
