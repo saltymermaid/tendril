@@ -1,4 +1,6 @@
-"""Database reset and reseed script.
+"""Database reset and reseed script — dev only.
+
+Drops all tables, runs migrations, and seeds with dev data.
 
 Run with: docker compose exec backend python -m scripts.reset_db
 """
@@ -8,7 +10,7 @@ import asyncio
 from sqlalchemy import text
 
 from app.database import engine
-from scripts.seed_data import seed_database
+from scripts.seed_dev import seed_database
 
 
 async def reset_database():
