@@ -107,7 +107,11 @@ async def google_login(request: Request):
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="Google OAuth not configured",
         )
-    redirect_uri = str(request.url_for("google_callback"))
+    if settings.base_url:
+        # Explicit base URL avoids http:// when behind Cloudflare Tunnel
+        redirect_uri = settings.base_url.rstrip("/") + "/api/auth/callback"
+    else:
+        redirect_uri = str(request.url_for("google_callback"))
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 

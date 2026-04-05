@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     app_name: str = "Tendril"
     debug: bool = False
     cors_origins: str = "http://localhost:5173"  # Comma-separated
+    base_url: str = ""  # e.g. https://tendril.garden — used to build OAuth redirect URIs
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
