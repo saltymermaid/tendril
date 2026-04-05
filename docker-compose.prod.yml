@@ -49,6 +49,7 @@ services:
       ALLOWED_EMAILS: ${ALLOWED_EMAILS}
       ENABLE_DEV_LOGIN: "false"
       CORS_ORIGINS: ${CORS_ORIGINS:-https://tendril.garden}
+      BASE_URL: ${BASE_URL:-}
       DEBUG: "false"
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
