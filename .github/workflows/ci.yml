@@ -206,8 +206,9 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Deploy
-        working-directory: ${{ secrets.DEPLOY_PATH || '/home/saltymermaid/tendril' }}
         run: |
+          cd /home/saltymermaid/tendril
+
           # Pull latest code
           git pull origin main
 
