@@ -29,6 +29,7 @@ class Variety(Base):
     days_to_germination_max: Mapped[int | None] = mapped_column(Integer, nullable=True)
     days_to_harvest_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
     days_to_harvest_max: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    seed_start_days: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Days to grow in tray before transplanting
 
     # Planting details
     planting_depth: Mapped[str | None] = mapped_column(String(50), nullable=True)

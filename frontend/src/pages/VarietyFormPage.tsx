@@ -19,6 +19,7 @@ interface VarietyFormData {
   days_to_germination_max: number | ''
   days_to_harvest_min: number | ''
   days_to_harvest_max: number | ''
+  seed_start_days: number | ''
   planting_depth: string
   spacing: string
   sunlight: string
@@ -40,6 +41,7 @@ const EMPTY_FORM: VarietyFormData = {
   days_to_germination_max: '',
   days_to_harvest_min: '',
   days_to_harvest_max: '',
+  seed_start_days: '',
   planting_depth: '',
   spacing: '1x1',
   sunlight: 'full_sun',
@@ -166,6 +168,7 @@ export function VarietyFormPage() {
           days_to_germination_max: data.days_to_germination_max ?? '',
           days_to_harvest_min: data.days_to_harvest_min ?? '',
           days_to_harvest_max: data.days_to_harvest_max ?? '',
+          seed_start_days: data.seed_start_days ?? '',
           planting_depth: data.planting_depth || '',
           spacing: data.spacing,
           sunlight: data.sunlight || 'full_sun',
@@ -233,6 +236,7 @@ export function VarietyFormPage() {
           days_to_germination_max: d.days_to_germination_max ?? prev.days_to_germination_max,
           days_to_harvest_min: d.days_to_harvest_min ?? prev.days_to_harvest_min,
           days_to_harvest_max: d.days_to_harvest_max ?? prev.days_to_harvest_max,
+          seed_start_days: d.seed_start_days ?? prev.seed_start_days,
           planting_depth: d.planting_depth || prev.planting_depth,
           spacing: d.spacing || prev.spacing,
           sunlight: d.sunlight || prev.sunlight,
@@ -281,6 +285,7 @@ export function VarietyFormPage() {
         days_to_germination_max: form.days_to_germination_max || null,
         days_to_harvest_min: form.days_to_harvest_min || null,
         days_to_harvest_max: form.days_to_harvest_max || null,
+        seed_start_days: form.seed_start_days || null,
       }
 
       const url = isEdit ? `/api/varieties/${id}` : '/api/varieties'
@@ -573,6 +578,25 @@ export function VarietyFormPage() {
               Climbing plant (requires trellis/support)
             </label>
           </div>
+
+          {(form.planting_method === 'transplant' || form.planting_method === 'both') && (
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Days in Tray Before Transplanting</label>
+                <input
+                  type="number"
+                  className="input"
+                  value={form.seed_start_days}
+                  onChange={(e) => updateField('seed_start_days', e.target.value ? parseInt(e.target.value) : '')}
+                  min={1}
+                  placeholder="e.g., 42"
+                />
+                <p className="form-help" style={{ marginTop: 'var(--space-1)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  How many days to grow in a starter tray before transplanting. Used to schedule "get seeds" and "start tray" reminders.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Season Override */}

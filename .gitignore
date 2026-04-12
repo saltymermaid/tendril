@@ -2,6 +2,8 @@
 
 .roo/
 memory-bank/
+CLAUDE.md
+.claude/
 
 # Python
 __pycache__/

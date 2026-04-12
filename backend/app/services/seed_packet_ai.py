@@ -8,7 +8,7 @@ import anthropic
 
 logger = logging.getLogger(__name__)
 
-EXTRACTION_PROMPT = """You are analyzing a photo of a seed packet for a gardening application. 
+EXTRACTION_PROMPT = """You are analyzing a photo of a seed packet for a gardening application.
 Extract as much planting information as possible from the image.
 
 Return a JSON object with ONLY the following fields (use null for any field you cannot determine):
@@ -19,6 +19,7 @@ Return a JSON object with ONLY the following fields (use null for any field you 
   "days_to_germination_max": integer or null,
   "days_to_harvest_min": integer or null,
   "days_to_harvest_max": integer or null,
+  "seed_start_days": integer or null,
   "planting_depth": "string like '1/4 inch' or '1/2 inch' or null",
   "spacing": "one of '1x1', '1x2', '2x2' based on plant spacing needs, or null",
   "sunlight": "one of 'full_sun', 'partial_shade', 'full_shade', or null",
@@ -31,6 +32,16 @@ Rules for spacing interpretation:
 - Plants needing 6" or less spacing → "1x1" (fits in one square foot)
 - Plants needing 12-18" spacing → "1x2" (needs 2 square feet)
 - Plants needing 24"+ spacing → "2x2" (needs 4 square feet)
+
+Rules for seed_start_days:
+- This is how many days to grow a seedling in a tray before transplanting into the garden.
+- Set this for any variety that can be transplanted (planting_method is 'transplant' or 'both').
+- Convert weeks to days (e.g., "start 6-8 weeks before transplanting" → 56, using the LARGER value).
+- Packet phrasings to watch for: "start indoors X weeks before", "transplant when X weeks old",
+  "sow X weeks ahead", "start X weeks before planting out", etc.
+- If the packet doesn't mention tray/indoor start time but you know this variety is typically
+  transplanted, use your general knowledge of the variety to provide a reasonable value in days.
+- If the variety is direct-sow only, use null.
 
 If the packet shows a range for days (e.g., "65-80 days"), use the lower number for min and higher for max.
 If only one number is given for days, use it for both min and max.
@@ -159,6 +170,7 @@ def _clean_extraction(data: dict) -> dict:
         "days_to_germination_max",
         "days_to_harvest_min",
         "days_to_harvest_max",
+        "seed_start_days",
     ]:
         val = data.get(field)
         if val is not None:

@@ -126,87 +126,89 @@ COMPANION_RULES = [
 
 # ─── Varieties ────────────────────────────────────────────────────────────────
 # (category, name, germ_min, germ_max, harvest_min, harvest_max, spacing,
-#  is_climbing, planting_method, depth, sunlight, notes)
+#  is_climbing, planting_method, depth, sunlight, notes, seed_start_days)
+# seed_start_days: days to grow in outdoor tray before transplanting (None = direct sow only)
+# Use the larger end of typical ranges to maximize transplant readiness.
 VARIETIES = [
-    # Tomatoes
-    ("Tomatoes", "Golden Jubilee",               7, 14,  72,  80, "2x2", False, "transplant",  "1/4 inch", "full_sun", None),
-    ("Tomatoes", "Husky Cherry Red",              7, 14,  65,  70, "1x1", False, "transplant",  "1/4 inch", "full_sun", "Compact determinate"),
-    ("Tomatoes", "Everglades",                    7, 14,  60,  70, "2x2", False, "both",        "1/4 inch", "full_sun", "Heat tolerant, Florida native"),
-    ("Tomatoes", "White Everglades Tomato",       7, 14,  60,  75, "1x1", False, "transplant",  "1/4 inch", "full_sun", "White fruited Everglades type, heat tolerant"),
-    ("Tomatoes", "Red Everglades Tomato",         7, 14,  60,  75, "1x1", False, "transplant",  "1/4 inch", "full_sun", "Red fruited Everglades type, heat tolerant"),
-    # Peppers
-    ("Peppers",  "Jalapeño",                     10, 14,  70,  80, "1x1", False, "transplant",  "1/4 inch", "full_sun", None),
-    ("Peppers",  "Cubanelle",                    10, 14,  65,  75, "1x1", False, "transplant",  "1/4 inch", "full_sun", None),
-    ("Peppers",  "Orange Sweet",                 10, 14,  75,  85, "1x1", False, "transplant",  "1/4 inch", "full_sun", None),
-    ("Peppers",  "Poblano",                      10, 14,  70,  80, "1x1", False, "transplant",  "1/4 inch", "full_sun", None),
-    ("Peppers",  "Sweet Banana Pepper",          10, 14,  65,  75, "1x1", False, "transplant",  "1/4 inch", "full_sun", "Stake for support"),
-    # Cucumbers
-    ("Cucumbers","Garden Bush Slicer",            7, 10,  55,  65, "1x2", False, "direct_sow",  "1 inch",   "full_sun", None),
-    ("Cucumbers","Double Yield Pickling",         7, 10,  50,  60, "1x2", True,  "direct_sow",  "1 inch",   "full_sun", None),
-    # Squash
-    ("Squash",   "Crookneck",                    7, 10,  50,  60, "2x2", False, "direct_sow",  "1 inch",   "full_sun", None),
-    ("Squash",   "Easy Pick Gold Zucchini",      7, 10,  45,  55, "2x2", False, "direct_sow",  "1 inch",   "full_sun", None),
-    ("Squash",   "Summer Golden Zucchini",       7, 10,  50,  60, "2x2", False, "direct_sow",  "1 inch",   "full_sun", "Future variety"),
-    ("Squash",   "Pumpkin Spookie",              7, 10,  90, 110, "2x2", True,  "direct_sow",  "1 inch",   "full_sun", "Future variety"),
-    ("Squash",   "Seminole Pumpkin",             7, 10,  90, 100, "1x1", True,  "direct_sow",  "1 inch",   "full_sun", "Vining; trellis required"),
-    ("Squash",   "Loofah",                       7, 14,  90, 120, "1x1", True,  "direct_sow",  "1 inch",   "full_sun", "Vining; trellis required; harvest when dry for sponges"),
-    ("Squash",   "Silver-line Melon",            7, 10,  70,  85, "1x1", True,  "direct_sow",  "1 inch",   "full_sun", "Vining melon; trellis required"),
-    # Beans
-    ("Beans",    "Royal Burgundy Bush",          7, 10,  50,  60, "1x1", False, "direct_sow",  "1 inch",   "full_sun", None),
-    ("Beans",    "Bush Cantare",                 7, 10,  50,  55, "1x1", False, "direct_sow",  "1 inch",   "full_sun", None),
-    ("Beans",    "Blue Lake Bush",               7, 10,  55,  60, "1x1", False, "direct_sow",  "1 inch",   "full_sun", None),
-    ("Beans",    "Pole Blue Lake",               7, 10,  60,  70, "1x1", True,  "direct_sow",  "1 inch",   "full_sun", "Future variety"),
-    ("Beans",    "Midnight Bean",                7, 10,  55,  65, "1x1", False, "direct_sow",  "1 inch",   "full_sun", "Black bean; bush type"),
-    ("Beans",    "PR Black Bean (vining)",       7, 10,  70,  85, "1x1", True,  "direct_sow",  "1 inch",   "full_sun", "Puerto Rican black bean; vigorous vining type; trellis required"),
-    # Sweet Potatoes
-    ("Sweet Potatoes", "Beauregard",             None, None, 90, 120, "2x2", False, "transplant", "slips",  "full_sun", "Plant from slips"),
-    # Bunching Onions
-    ("Bunching Onions", "Evergreen",             10, 14,  60,  70, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", None),
-    ("Bunching Onions", "Red Beard",             10, 14,  60,  70, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", None),
-    ("Bunching Onions", "Warrior",               10, 14,  60,  70, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", None),
-    ("Bunching Onions", "Lisbon Bunching Onion", 10, 14,  60,  70, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Generic bunching onion"),
-    # Peas
-    ("Peas",     "Snap Patio Pride",              7, 10,  55,  65, "1x1", True,  "direct_sow",  "1 inch",   "full_sun", "Future variety"),
-    # Cabbage
-    ("Cabbage",  "Dwarf Pak Choi",               5, 10,  45,  55, "1x1", False, "both",        "1/4 inch", "partial_shade", "Future variety"),
-    # Melons
-    ("Melons",   "Honey Rock Cantaloupe",        7, 10,  80,  90, "2x2", True,  "direct_sow",  "1 inch",   "full_sun", "Future variety"),
-    # Radishes
-    ("Radishes", "Watermelon Radish",            5,  7,  55,  65, "1x1", False, "direct_sow",  "1/2 inch", "full_sun", None),
+    # Tomatoes — 6-8 weeks in tray
+    ("Tomatoes", "Golden Jubilee",               7, 14,  72,  80, "2x2", False, "transplant",  "1/4 inch", "full_sun", None,                                              56),
+    ("Tomatoes", "Husky Cherry Red",              7, 14,  65,  70, "1x1", False, "transplant",  "1/4 inch", "full_sun", "Compact determinate",                             56),
+    ("Tomatoes", "Everglades",                    7, 14,  60,  70, "2x2", False, "both",        "1/4 inch", "full_sun", "Heat tolerant, Florida native",                   56),
+    ("Tomatoes", "White Everglades Tomato",       7, 14,  60,  75, "1x1", False, "transplant",  "1/4 inch", "full_sun", "White fruited Everglades type, heat tolerant",    56),
+    ("Tomatoes", "Red Everglades Tomato",         7, 14,  60,  75, "1x1", False, "transplant",  "1/4 inch", "full_sun", "Red fruited Everglades type, heat tolerant",      56),
+    # Peppers — 8-10 weeks in tray
+    ("Peppers",  "Jalapeño",                     10, 14,  70,  80, "1x1", False, "transplant",  "1/4 inch", "full_sun", None,                                              70),
+    ("Peppers",  "Cubanelle",                    10, 14,  65,  75, "1x1", False, "transplant",  "1/4 inch", "full_sun", None,                                              70),
+    ("Peppers",  "Orange Sweet",                 10, 14,  75,  85, "1x1", False, "transplant",  "1/4 inch", "full_sun", None,                                              70),
+    ("Peppers",  "Poblano",                      10, 14,  70,  80, "1x1", False, "transplant",  "1/4 inch", "full_sun", None,                                              70),
+    ("Peppers",  "Sweet Banana Pepper",          10, 14,  65,  75, "1x1", False, "transplant",  "1/4 inch", "full_sun", "Stake for support",                               70),
+    # Cucumbers — direct sow
+    ("Cucumbers","Garden Bush Slicer",            7, 10,  55,  65, "1x2", False, "direct_sow",  "1 inch",   "full_sun", None,                                              None),
+    ("Cucumbers","Double Yield Pickling",         7, 10,  50,  60, "1x2", True,  "direct_sow",  "1 inch",   "full_sun", None,                                              None),
+    # Squash — direct sow
+    ("Squash",   "Crookneck",                    7, 10,  50,  60, "2x2", False, "direct_sow",  "1 inch",   "full_sun", None,                                              None),
+    ("Squash",   "Easy Pick Gold Zucchini",      7, 10,  45,  55, "2x2", False, "direct_sow",  "1 inch",   "full_sun", None,                                              None),
+    ("Squash",   "Summer Golden Zucchini",       7, 10,  50,  60, "2x2", False, "direct_sow",  "1 inch",   "full_sun", "Future variety",                                  None),
+    ("Squash",   "Pumpkin Spookie",              7, 10,  90, 110, "2x2", True,  "direct_sow",  "1 inch",   "full_sun", "Future variety",                                  None),
+    ("Squash",   "Seminole Pumpkin",             7, 10,  90, 100, "1x1", True,  "direct_sow",  "1 inch",   "full_sun", "Vining; trellis required",                        None),
+    ("Squash",   "Loofah",                       7, 14,  90, 120, "1x1", True,  "direct_sow",  "1 inch",   "full_sun", "Vining; trellis required; harvest when dry for sponges", None),
+    ("Squash",   "Silver-line Melon",            7, 10,  70,  85, "1x1", True,  "direct_sow",  "1 inch",   "full_sun", "Vining melon; trellis required",                  None),
+    # Beans — direct sow
+    ("Beans",    "Royal Burgundy Bush",          7, 10,  50,  60, "1x1", False, "direct_sow",  "1 inch",   "full_sun", None,                                              None),
+    ("Beans",    "Bush Cantare",                 7, 10,  50,  55, "1x1", False, "direct_sow",  "1 inch",   "full_sun", None,                                              None),
+    ("Beans",    "Blue Lake Bush",               7, 10,  55,  60, "1x1", False, "direct_sow",  "1 inch",   "full_sun", None,                                              None),
+    ("Beans",    "Pole Blue Lake",               7, 10,  60,  70, "1x1", True,  "direct_sow",  "1 inch",   "full_sun", "Future variety",                                  None),
+    ("Beans",    "Midnight Bean",                7, 10,  55,  65, "1x1", False, "direct_sow",  "1 inch",   "full_sun", "Black bean; bush type",                           None),
+    ("Beans",    "PR Black Bean (vining)",       7, 10,  70,  85, "1x1", True,  "direct_sow",  "1 inch",   "full_sun", "Puerto Rican black bean; vigorous vining type; trellis required", None),
+    # Sweet Potatoes — grown from slips, not seeds; no seed_start_days
+    ("Sweet Potatoes", "Beauregard",             None, None, 90, 120, "2x2", False, "transplant", "slips",  "full_sun", "Plant from slips",                                None),
+    # Bunching Onions — direct sow
+    ("Bunching Onions", "Evergreen",             10, 14,  60,  70, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", None,                                             None),
+    ("Bunching Onions", "Red Beard",             10, 14,  60,  70, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", None,                                             None),
+    ("Bunching Onions", "Warrior",               10, 14,  60,  70, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", None,                                             None),
+    ("Bunching Onions", "Lisbon Bunching Onion", 10, 14,  60,  70, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Generic bunching onion",                         None),
+    # Peas — direct sow
+    ("Peas",     "Snap Patio Pride",              7, 10,  55,  65, "1x1", True,  "direct_sow",  "1 inch",   "full_sun", "Future variety",                                  None),
+    # Cabbage — 3-4 weeks in tray
+    ("Cabbage",  "Dwarf Pak Choi",               5, 10,  45,  55, "1x1", False, "both",        "1/4 inch", "partial_shade", "Future variety",                             28),
+    # Melons — direct sow
+    ("Melons",   "Honey Rock Cantaloupe",        7, 10,  80,  90, "2x2", True,  "direct_sow",  "1 inch",   "full_sun", "Future variety",                                  None),
+    # Radishes — direct sow
+    ("Radishes", "Watermelon Radish",            5,  7,  55,  65, "1x1", False, "direct_sow",  "1/2 inch", "full_sun", None,                                              None),
     # Herbs
-    ("Herbs",    "Rosemary",                    14, 21,  80,  90, "1x1", False, "transplant",  "surface",  "full_sun", "Perennial in 10a"),
-    ("Herbs",    "English Thyme",               14, 21,  70,  80, "1x1", False, "transplant",  "surface",  "full_sun", "Perennial in 10a"),
-    ("Herbs",    "French Thyme",                14, 21,  70,  80, "1x1", False, "transplant",  "surface",  "full_sun", "Future variety"),
-    ("Herbs",    "Slow-Bolt Cilantro",           7, 10,  45,  55, "1x1", False, "direct_sow",  "1/4 inch", "partial_shade", None),
-    ("Herbs",    "Bouquet Dill",                10, 14,  60,  70, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", None),
-    ("Herbs",    "Mammoth Dill",                10, 14,  65,  75, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Future variety"),
-    ("Herbs",    "Italian Large Leaf Basil",     7, 10,  50,  60, "1x1", False, "both",        "1/4 inch", "full_sun", None),
-    ("Herbs",    "Green Basil",                  7, 10,  50,  60, "1x1", False, "both",        "1/4 inch", "full_sun", "Sweet green basil"),
-    ("Herbs",    "Purple Basil",                 7, 10,  50,  60, "1x1", False, "both",        "1/4 inch", "full_sun", "Ornamental and culinary"),
-    ("Herbs",    "Common Chives",               14, 21,  75,  90, "1x1", False, "transplant",  "1/4 inch", "full_sun", "Perennial"),
-    ("Herbs",    "Chives",                      14, 21,  75,  90, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Garlic or common chives"),
-    ("Herbs",    "Parsley",                     14, 21,  70,  90, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Flat-leaf or curly"),
-    ("Herbs",    "Oregano",                     10, 14,  80,  90, "1x1", False, "both",        "surface",  "full_sun", "Mediterranean herb; perennial in 10a"),
-    # Flowers
-    ("Flowers",  "Queen Sophia Marigold",        5,  7,  50,  60, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Great companion"),
-    ("Flowers",  "Naughty Marietta Marigold",    5,  7,  50,  60, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Great companion"),
-    ("Flowers",  "French Red Cherry Marigold",   5,  7,  50,  60, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Great companion"),
-    ("Flowers",  "Marigold (French Double Dwarf)",5, 7,  50,  60, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Compact double-flowered marigold"),
-    ("Flowers",  "Marigold",                     5,  7,  50,  60, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "General marigold; pest deterrent"),
-    ("Flowers",  "Roselle",                     10, 14, 120, 150, "2x2", False, "direct_sow",  "1/4 inch", "full_sun", "Hibiscus for teas; ornamental"),
-    ("Flowers",  "Thai Red Roselle",            10, 14, 120, 150, "2x2", False, "direct_sow",  "1/4 inch", "full_sun", "Red-stemmed Roselle variety; calyces for hibiscus tea"),
-    ("Flowers",  "Roselle St. Kitts & Nevis",   10, 14, 120, 150, "2x2", False, "direct_sow",  "1/4 inch", "full_sun", "Second Roselle variety; ornamental and edible calyces"),
-    ("Flowers",  "Cranberry Hibiscus",          7, 14,  90, 120, "2x2", False, "direct_sow",  "1/4 inch", "full_sun", "Deep red foliage; edible leaves; ornamental"),
-    ("Flowers",  "Butterfly Pea",               7, 14,  60,  90, "1x1", True,  "direct_sow",  "1/4 inch", "full_sun", "Vining; trellis required; blue flowers for tea"),
-    ("Flowers",  "Nasturtium (Jewel Mixed Colors)", 7, 10, 55, 70, "1x1", False, "direct_sow", "1/2 inch", "full_sun", "Edible flowers and leaves; compact mounding"),
-    ("Flowers",  "Zinnia (Pinwheel Mixed Colors)",  5,  7, 60, 75, "1x1", False, "direct_sow", "1/4 inch", "full_sun", "Bright mixed colors; pollinator attractor"),
-    # Okra
-    ("Okra",     "Red Burgundy",                5,  7,  50,  65, "1x1", False, "direct_sow",  "1/2 inch", "full_sun", "First okra variety"),
-    ("Okra",     "Clemson Spineless 80",        5,  7,  50,  65, "1x1", False, "direct_sow",  "1/2 inch", "full_sun", "Second okra variety"),
-    # Eggplant
-    ("Eggplant", "Little Fingers Eggplant",     10, 14,  65,  80, "1x1", False, "transplant",  "1/4 inch", "full_sun", "Slender finger-sized fruits; prolific producer"),
-    ("Eggplant", "Rosa Bianca Eggplant",        10, 14,  65,  80, "1x1", False, "transplant",  "1/4 inch", "full_sun", "Slender finger-sized fruits; prolific producer"),
-    ("Eggplant", "Ping Tung Eggplant",          10, 14,  65,  80, "1x1", False, "transplant",  "1/4 inch", "full_sun", "Long slender Taiwanese variety; mild flavor"),
+    ("Herbs",    "Rosemary",                    14, 21,  80,  90, "1x1", False, "transplant",  "surface",  "full_sun", "Perennial in 10a",                                56),
+    ("Herbs",    "English Thyme",               14, 21,  70,  80, "1x1", False, "transplant",  "surface",  "full_sun", "Perennial in 10a",                                56),
+    ("Herbs",    "French Thyme",                14, 21,  70,  80, "1x1", False, "transplant",  "surface",  "full_sun", "Future variety",                                  56),
+    ("Herbs",    "Slow-Bolt Cilantro",           7, 10,  45,  55, "1x1", False, "direct_sow",  "1/4 inch", "partial_shade", None,                                         None),
+    ("Herbs",    "Bouquet Dill",                10, 14,  60,  70, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", None,                                              None),
+    ("Herbs",    "Mammoth Dill",                10, 14,  65,  75, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Future variety",                                  None),
+    ("Herbs",    "Italian Large Leaf Basil",     7, 10,  50,  60, "1x1", False, "both",        "1/4 inch", "full_sun", None,                                              28),
+    ("Herbs",    "Green Basil",                  7, 10,  50,  60, "1x1", False, "both",        "1/4 inch", "full_sun", "Sweet green basil",                               28),
+    ("Herbs",    "Purple Basil",                 7, 10,  50,  60, "1x1", False, "both",        "1/4 inch", "full_sun", "Ornamental and culinary",                         28),
+    ("Herbs",    "Common Chives",               14, 21,  75,  90, "1x1", False, "transplant",  "1/4 inch", "full_sun", "Perennial",                                       56),
+    ("Herbs",    "Chives",                      14, 21,  75,  90, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Garlic or common chives",                         None),
+    ("Herbs",    "Parsley",                     14, 21,  70,  90, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Flat-leaf or curly",                              None),
+    ("Herbs",    "Oregano",                     10, 14,  80,  90, "1x1", False, "both",        "surface",  "full_sun", "Mediterranean herb; perennial in 10a",             42),
+    # Flowers — direct sow
+    ("Flowers",  "Queen Sophia Marigold",        5,  7,  50,  60, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Great companion",                                 None),
+    ("Flowers",  "Naughty Marietta Marigold",    5,  7,  50,  60, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Great companion",                                 None),
+    ("Flowers",  "French Red Cherry Marigold",   5,  7,  50,  60, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Great companion",                                 None),
+    ("Flowers",  "Marigold (French Double Dwarf)",5, 7,  50,  60, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "Compact double-flowered marigold",                None),
+    ("Flowers",  "Marigold",                     5,  7,  50,  60, "1x1", False, "direct_sow",  "1/4 inch", "full_sun", "General marigold; pest deterrent",                None),
+    ("Flowers",  "Roselle",                     10, 14, 120, 150, "2x2", False, "direct_sow",  "1/4 inch", "full_sun", "Hibiscus for teas; ornamental",                   None),
+    ("Flowers",  "Thai Red Roselle",            10, 14, 120, 150, "2x2", False, "direct_sow",  "1/4 inch", "full_sun", "Red-stemmed Roselle variety; calyces for hibiscus tea", None),
+    ("Flowers",  "Roselle St. Kitts & Nevis",   10, 14, 120, 150, "2x2", False, "direct_sow",  "1/4 inch", "full_sun", "Second Roselle variety; ornamental and edible calyces", None),
+    ("Flowers",  "Cranberry Hibiscus",          7, 14,  90, 120, "2x2", False, "direct_sow",  "1/4 inch", "full_sun", "Deep red foliage; edible leaves; ornamental",     None),
+    ("Flowers",  "Butterfly Pea",               7, 14,  60,  90, "1x1", True,  "direct_sow",  "1/4 inch", "full_sun", "Vining; trellis required; blue flowers for tea",  None),
+    ("Flowers",  "Nasturtium (Jewel Mixed Colors)", 7, 10, 55, 70, "1x1", False, "direct_sow", "1/2 inch", "full_sun", "Edible flowers and leaves; compact mounding",     None),
+    ("Flowers",  "Zinnia (Pinwheel Mixed Colors)",  5,  7, 60, 75, "1x1", False, "direct_sow", "1/4 inch", "full_sun", "Bright mixed colors; pollinator attractor",       None),
+    # Okra — direct sow
+    ("Okra",     "Red Burgundy",                5,  7,  50,  65, "1x1", False, "direct_sow",  "1/2 inch", "full_sun", "First okra variety",                              None),
+    ("Okra",     "Clemson Spineless 80",        5,  7,  50,  65, "1x1", False, "direct_sow",  "1/2 inch", "full_sun", "Second okra variety",                             None),
+    # Eggplant — 6-8 weeks in tray
+    ("Eggplant", "Little Fingers Eggplant",     10, 14,  65,  80, "1x1", False, "transplant",  "1/4 inch", "full_sun", "Slender finger-sized fruits; prolific producer",  56),
+    ("Eggplant", "Rosa Bianca Eggplant",        10, 14,  65,  80, "1x1", False, "transplant",  "1/4 inch", "full_sun", "Slender finger-sized fruits; prolific producer",  56),
+    ("Eggplant", "Ping Tung Eggplant",          10, 14,  65,  80, "1x1", False, "transplant",  "1/4 inch", "full_sun", "Long slender Taiwanese variety; mild flavor",     56),
 ]
 
 
@@ -271,11 +273,12 @@ async def seed_reference(session, email: str, name: str = "Dev User"):
     # ── 5. Create varieties ───────────────────────────────────────────────────
     var_map: dict[str, Variety] = {}
     for v in VARIETIES:
-        cat_name, vname, dg_min, dg_max, dh_min, dh_max, spacing, climbing, method, depth, sun, notes = v
+        cat_name, vname, dg_min, dg_max, dh_min, dh_max, spacing, climbing, method, depth, sun, notes, ssd = v
         variety = Variety(
             user_id=user.id, category_id=cat_map[cat_name].id, name=vname,
             days_to_germination_min=dg_min, days_to_germination_max=dg_max,
             days_to_harvest_min=dh_min, days_to_harvest_max=dh_max,
+            seed_start_days=ssd,
             spacing=spacing, is_climbing=climbing, planting_method=method,
             planting_depth=depth, sunlight=sun, notes=notes,
         )

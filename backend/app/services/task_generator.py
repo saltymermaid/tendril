@@ -80,6 +80,61 @@ async def generate_tasks_for_user(db: AsyncSession, user_id: int) -> int:
                     existing_keys.add(key)
                     created_count += 1
 
+            # Seed tray start reminders for transplantable plantings
+            effective_method = planting.planting_method or (
+                planting.variety.planting_method if planting.variety else None
+            )
+            seed_start_days = planting.variety.seed_start_days if planting.variety else None
+            if effective_method in ("transplant", "both") and seed_start_days:
+                start_seeds_date = planting.start_date - timedelta(days=seed_start_days)
+                get_seeds_date = start_seeds_date - timedelta(days=30)
+
+                # "Get seeds" reminder — due 30 days before tray start
+                days_until_get_seeds = (get_seeds_date - today).days
+                if -3 <= days_until_get_seeds <= 14:
+                    title = f"🛒 Get seeds: {variety_name}"
+                    key = (planting.id, title[:40])
+                    if key not in existing_keys:
+                        db.add(Task(
+                            user_id=user_id,
+                            title=title,
+                            description=(
+                                f"Make sure you have {variety_name} seeds on hand. "
+                                f"You'll need to start them in a tray on {start_seeds_date} "
+                                f"to be ready to transplant into {container_name} on {planting.start_date}."
+                            ),
+                            due_date=get_seeds_date,
+                            source="auto",
+                            container_id=planting.container_id,
+                            planting_id=planting.id,
+                            variety_id=planting.variety_id,
+                        ))
+                        existing_keys.add(key)
+                        created_count += 1
+
+                # "Start seeds in tray" reminder — due on tray start date
+                days_until_start_seeds = (start_seeds_date - today).days
+                if -3 <= days_until_start_seeds <= 14:
+                    title = f"🌿 Start seeds in tray: {variety_name}"
+                    key = (planting.id, title[:40])
+                    if key not in existing_keys:
+                        db.add(Task(
+                            user_id=user_id,
+                            title=title,
+                            description=(
+                                f"Start {variety_name} seeds in a tray today. "
+                                f"They need {seed_start_days} days to reach transplant size. "
+                                f"Target transplant date: {planting.start_date} into {container_name}."
+                            ),
+                            due_date=start_seeds_date,
+                            source="auto",
+                            container_id=planting.container_id,
+                            planting_id=planting.id,
+                            variety_id=planting.variety_id,
+                        ))
+                        existing_keys.add(key)
+                        created_count += 1
+
         elif planting.status == "in_progress":
             # Germination check-in: 7-14 days after activation
             # We use start_date as proxy for activation date

@@ -148,6 +148,44 @@ async def seed_database():
         )
         planting_list.append(p_pepper)
 
+        # ── Task-generation test plantings (not_started, future) ─────────────
+        #
+        # C1: Tomato — fires "start seeds" task (seed_start_days=56, start in ~60 days)
+        #   start_seeds_date = TODAY+60 - 56 = TODAY+4  → in the -3..14 window
+        #   get_seeds_date   = TODAY+4  - 30 = TODAY-26 → past, no task
+        planting_list.append(planting(
+            bed.id, "Golden Jubilee", 0, 2, 1, 1,
+            start_date=TODAY + timedelta(days=60),
+            end_date=TODAY + timedelta(days=140),
+            status="not_started",
+            method="transplant",
+            qty=1,
+        ))
+
+        # C5: Tomato — fires "get seeds" task (seed_start_days=56, start in ~90 days)
+        #   start_seeds_date = TODAY+90 - 56 = TODAY+34 → future, outside window
+        #   get_seeds_date   = TODAY+34 - 30 = TODAY+4  → in the -3..14 window
+        planting_list.append(planting(
+            bed.id, "Husky Cherry Red", 4, 2, 1, 1,
+            start_date=TODAY + timedelta(days=90),
+            end_date=TODAY + timedelta(days=160),
+            status="not_started",
+            method="transplant",
+            qty=1,
+        ))
+
+        # D2: Pepper — fires "start seeds" task (seed_start_days=70, start in ~75 days)
+        #   start_seeds_date = TODAY+75 - 70 = TODAY+5  → in the -3..14 window
+        #   get_seeds_date   = TODAY+5  - 30 = TODAY-25 → past, no task
+        planting_list.append(planting(
+            bed.id, "Cubanelle", 1, 3, 1, 1,
+            start_date=TODAY + timedelta(days=75),
+            end_date=TODAY + timedelta(days=145),
+            status="not_started",
+            method="transplant",
+            qty=1,
+        ))
+
         # A4: In-progress marigold (cage square)
         p_marigold_a4 = planting(
             bed.id, "Marigold", 3, 0, 1, 1,
@@ -241,34 +279,29 @@ async def seed_database():
         # tower_level is 0-indexed (0 = top / Level 1 in UI)
         # square_x is pocket index (0-indexed)
         tower_date = TODAY - timedelta(days=7)
-        tower_levels = [
+        tower_samples = [
             (0, "Naughty Marietta Marigold"),        # Level 1 (top)
-            (1, "Nasturtium (Jewel Mixed Colors)"),  # Level 2
-            (2, "Marigold (French Double Dwarf)"),   # Level 3
-            (3, "Zinnia (Pinwheel Mixed Colors)"),   # Level 4
-            (4, "French Red Cherry Marigold"),       # Level 5
-            (5, "Naughty Marietta Marigold"),        # Level 6
+            (3, "Zinnia (Pinwheel Mixed Colors)"),   # Level 4 (middle)
             (6, "Nasturtium (Jewel Mixed Colors)"),  # Level 7 (bottom)
         ]
         tower_plantings: list[Planting] = []
-        for level_idx, var_name in tower_levels:
+        for level_idx, var_name in tower_samples:
             variety = var_map[var_name]
             end_days = variety.days_to_harvest_max or 60
-            for pocket in range(6):
-                p = Planting(
-                    user_id=user.id,
-                    container_id=tower.id,
-                    variety_id=variety.id,
-                    square_x=pocket, square_y=0, square_width=1, square_height=1,
-                    tower_level=level_idx,
-                    start_date=tower_date,
-                    end_date=tower_date + timedelta(days=end_days),
-                    status="in_progress",
-                    planting_method=variety.planting_method,
-                    quantity=1,
-                )
-                session.add(p)
-                tower_plantings.append(p)
+            p = Planting(
+                user_id=user.id,
+                container_id=tower.id,
+                variety_id=variety.id,
+                square_x=0, square_y=0, square_width=1, square_height=1,
+                tower_level=level_idx,
+                start_date=tower_date,
+                end_date=tower_date + timedelta(days=end_days),
+                status="in_progress",
+                planting_method=variety.planting_method,
+                quantity=1,
+            )
+            session.add(p)
+            tower_plantings.append(p)
         await session.flush()
         print(f"  Created {len(planting_list) + len(tower_plantings)} plantings"
               f" ({len(planting_list)} bed, {len(tower_plantings)} tower)")
@@ -321,7 +354,7 @@ async def seed_database():
                 square_x=p.square_x,
                 square_y=0,
                 tower_level=p.tower_level,
-                notes=f"Seeded level {p.tower_level + 1} pocket {p.square_x + 1}",
+                notes=f"Seeded level {p.tower_level + 1}",
             ))
             event_count += 1
 

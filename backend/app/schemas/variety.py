@@ -14,6 +14,7 @@ class VarietyBase(BaseModel):
     days_to_germination_max: int | None = None
     days_to_harvest_min: int | None = None
     days_to_harvest_max: int | None = None
+    seed_start_days: int | None = None
     planting_depth: str | None = None
     spacing: str = "1x1"
     sunlight: str | None = None
@@ -39,6 +40,7 @@ class VarietyUpdate(BaseModel):
     days_to_germination_max: int | None = None
     days_to_harvest_min: int | None = None
     days_to_harvest_max: int | None = None
+    seed_start_days: int | None = None
     planting_depth: str | None = None
     spacing: str | None = None
     sunlight: str | None = None

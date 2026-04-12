@@ -17,6 +17,7 @@ interface VarietyDetail {
   days_to_germination_max: number | null
   days_to_harvest_min: number | null
   days_to_harvest_max: number | null
+  seed_start_days: number | null
   planting_depth: string | null
   spacing: string
   sunlight: string | null
@@ -273,6 +274,12 @@ export function VarietyDetailPage() {
               <dt>Planting Method</dt>
               <dd>{variety.planting_method.replace('_', ' ')}</dd>
             </div>
+            {variety.seed_start_days && (
+              <div className="detail-item">
+                <dt>Days in Tray</dt>
+                <dd>{variety.seed_start_days} days before transplanting</dd>
+              </div>
+            )}
           </dl>
         </div>
 

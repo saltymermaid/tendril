@@ -48,6 +48,7 @@ def _variety_to_response(variety: Variety) -> VarietyResponse:
         days_to_germination_max=variety.days_to_germination_max,
         days_to_harvest_min=variety.days_to_harvest_min,
         days_to_harvest_max=variety.days_to_harvest_max,
+        seed_start_days=variety.seed_start_days,
         planting_depth=variety.planting_depth,
         spacing=variety.spacing,
         sunlight=variety.sunlight,
