@@ -163,6 +163,17 @@ export function ContainerDetailPage() {
   const [selectedPlanting, setSelectedPlanting] = useState<PlantingData | null>(null)
   const [activating, setActivating] = useState(false)
 
+  // Planting edit state
+  const [editingPlanting, setEditingPlanting] = useState(false)
+  const [editForm, setEditForm] = useState({
+    start_date: '',
+    end_date: '',
+    planting_method: '' as string,
+    quantity: '' as string,
+  })
+  const [editError, setEditError] = useState('')
+  const [editSubmitting, setEditSubmitting] = useState(false)
+
   // Recommendation state
   const [recommendations, setRecommendations] = useState<RecommendationData | null>(null)
   const [recLoading, setRecLoading] = useState(false)
@@ -304,6 +315,60 @@ export function ContainerDetailPage() {
       }
     } finally {
       setActivating(false)
+    }
+  }
+
+  function startEditPlanting() {
+    if (!selectedPlanting) return
+    setEditForm({
+      start_date: selectedPlanting.start_date,
+      end_date: selectedPlanting.end_date,
+      planting_method: selectedPlanting.planting_method || '',
+      quantity: selectedPlanting.quantity ? String(selectedPlanting.quantity) : '',
+    })
+    setEditError('')
+    setEditingPlanting(true)
+  }
+
+  function cancelEditPlanting() {
+    setEditingPlanting(false)
+    setEditError('')
+  }
+
+  async function handleUpdatePlanting(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedPlanting) return
+
+    setEditSubmitting(true)
+    setEditError('')
+
+    try {
+      const body: Record<string, unknown> = {
+        start_date: editForm.start_date,
+        end_date: editForm.end_date,
+        planting_method: editForm.planting_method || null,
+        quantity: editForm.quantity ? Number(editForm.quantity) : null,
+      }
+
+      const res = await apiFetch(`/api/plantings/${selectedPlanting.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.detail || 'Failed to update planting')
+      }
+
+      const updated: PlantingData = await res.json()
+      setSelectedPlanting(updated)
+      setPlantings(prev => prev.map(p => (p.id === updated.id ? updated : p)))
+      setEditingPlanting(false)
+    } catch (err: unknown) {
+      setEditError(err instanceof Error ? err.message : 'Failed to update planting')
+    } finally {
+      setEditSubmitting(false)
     }
   }
 
@@ -459,6 +524,8 @@ export function ContainerDetailPage() {
     const planting = getPlantingAt(x, y)
     if (planting) {
       setSelectedPlanting(planting)
+      setEditingPlanting(false)
+      setEditError('')
       setSupportMenu(null)
     } else {
       setSquareChooser({ x, y })
@@ -706,6 +773,8 @@ export function ContainerDetailPage() {
                         onClick={() => {
                           if (planting) {
                             setSelectedPlanting(planting)
+                            setEditingPlanting(false)
+                            setEditError('')
                           } else {
                             setSquareChooser({ x: pocket, y: 0, towerLevel: level })
                           }
@@ -952,89 +1021,167 @@ export function ContainerDetailPage() {
               <button className="modal-close" onClick={() => setSelectedPlanting(null)}>✕</button>
             </div>
 
-            <div className="planting-detail-body">
-              <div className="detail-grid compact">
-                <div className="detail-item">
-                  <span className="detail-label">Category</span>
-                  <span className="detail-value">{selectedPlanting.category_name}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Position</span>
-                  <span className="detail-value">
-                    {selectedPlanting.tower_level !== null
-                      ? `Level ${selectedPlanting.tower_level + 1}, Pocket ${selectedPlanting.square_x + 1}`
-                      : `${ROW_LABELS[selectedPlanting.square_y]}${selectedPlanting.square_x + 1}`}
-                    {selectedPlanting.square_width > 1 || selectedPlanting.square_height > 1
-                      ? ` (${selectedPlanting.square_width}×${selectedPlanting.square_height})`
-                      : ''}
-                  </span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Status</span>
-                  <span className={`status-badge ${selectedPlanting.status}`}>
-                    {statusLabel(selectedPlanting.status)}
-                  </span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Dates</span>
-                  <span className="detail-value">{selectedPlanting.start_date} → {selectedPlanting.end_date}</span>
-                </div>
-                {selectedPlanting.planting_method && (
-                  <div className="detail-item">
-                    <span className="detail-label">Method</span>
-                    <span className="detail-value">{selectedPlanting.planting_method.replace('_', ' ')}</span>
+            {editingPlanting ? (
+              <form onSubmit={handleUpdatePlanting}>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Start Date *</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={editForm.start_date}
+                      onChange={(e) => setEditForm({ ...editForm, start_date: e.target.value })}
+                      required
+                      autoComplete="off"
+                      data-1p-ignore
+                      data-lpignore="true"
+                    />
                   </div>
-                )}
-                {selectedPlanting.quantity && (
-                  <div className="detail-item">
-                    <span className="detail-label">Quantity</span>
-                    <span className="detail-value">{selectedPlanting.quantity}</span>
+                  <div className="form-group">
+                    <label className="form-label">End Date *</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={editForm.end_date}
+                      onChange={(e) => setEditForm({ ...editForm, end_date: e.target.value })}
+                      required
+                      autoComplete="off"
+                      data-1p-ignore
+                      data-lpignore="true"
+                    />
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
 
-            <div className="modal-actions">
-              <Link
-                to={`/plantings/${selectedPlanting.id}`}
-                className="btn btn-outline-dark"
-              >
-                View Details
-              </Link>
-              {selectedPlanting.status === 'not_started' && (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => handleActivatePlanting(selectedPlanting.id)}
-                  disabled={activating}
-                >
-                  {activating ? '…' : '🌱 Plant Now'}
-                </button>
-              )}
-              {selectedPlanting.status === 'in_progress' && (
-                <Link
-                  to={`/plantings/${selectedPlanting.id}`}
-                  className="btn btn-primary"
-                  onClick={() => setSelectedPlanting(null)}
-                >
-                  🌾 Log Harvest
-                </Link>
-              )}
-              <button
-                className="btn btn-outline"
-                title="Plan a successor crop for this square"
-                onClick={() => {
-                  const p = selectedPlanting
-                  setSelectedPlanting(null)
-                  setSquareChooser({
-                    x: p.square_x,
-                    y: p.square_y ?? 0,
-                    towerLevel: p.tower_level ?? undefined,
-                  })
-                }}
-              >
-                ➕ Plan Next
-              </button>
-            </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Method</label>
+                    <select
+                      className="form-input"
+                      value={editForm.planting_method}
+                      onChange={(e) => setEditForm({ ...editForm, planting_method: e.target.value })}
+                    >
+                      <option value="">—</option>
+                      <option value="direct_sow">Direct Sow</option>
+                      <option value="transplant">Transplant</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Quantity</label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      min="1"
+                      value={editForm.quantity}
+                      onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+                      placeholder="Optional"
+                      autoComplete="off"
+                      data-1p-ignore
+                      data-lpignore="true"
+                    />
+                  </div>
+                </div>
+
+                {editError && <div className="form-message error">{editError}</div>}
+
+                <div className="modal-actions">
+                  <button type="button" className="btn btn-outline-dark" onClick={cancelEditPlanting}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={editSubmitting}>
+                    {editSubmitting ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <div className="planting-detail-body">
+                  <div className="detail-grid compact">
+                    <div className="detail-item">
+                      <span className="detail-label">Category</span>
+                      <span className="detail-value">{selectedPlanting.category_name}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Position</span>
+                      <span className="detail-value">
+                        {selectedPlanting.tower_level !== null
+                          ? `Level ${selectedPlanting.tower_level + 1}, Pocket ${selectedPlanting.square_x + 1}`
+                          : `${ROW_LABELS[selectedPlanting.square_y]}${selectedPlanting.square_x + 1}`}
+                        {selectedPlanting.square_width > 1 || selectedPlanting.square_height > 1
+                          ? ` (${selectedPlanting.square_width}×${selectedPlanting.square_height})`
+                          : ''}
+                      </span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Status</span>
+                      <span className={`status-badge ${selectedPlanting.status}`}>
+                        {statusLabel(selectedPlanting.status)}
+                      </span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Dates</span>
+                      <span className="detail-value">{selectedPlanting.start_date} → {selectedPlanting.end_date}</span>
+                    </div>
+                    {selectedPlanting.planting_method && (
+                      <div className="detail-item">
+                        <span className="detail-label">Method</span>
+                        <span className="detail-value">{selectedPlanting.planting_method.replace('_', ' ')}</span>
+                      </div>
+                    )}
+                    {selectedPlanting.quantity && (
+                      <div className="detail-item">
+                        <span className="detail-label">Quantity</span>
+                        <span className="detail-value">{selectedPlanting.quantity}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="modal-actions">
+                  <button className="btn btn-outline-dark" onClick={startEditPlanting}>
+                    ✏️ Edit
+                  </button>
+                  <Link
+                    to={`/plantings/${selectedPlanting.id}`}
+                    className="btn btn-outline-dark"
+                  >
+                    View Details
+                  </Link>
+                  {selectedPlanting.status === 'not_started' && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => handleActivatePlanting(selectedPlanting.id)}
+                      disabled={activating}
+                    >
+                      {activating ? '…' : '🌱 Plant Now'}
+                    </button>
+                  )}
+                  {selectedPlanting.status === 'in_progress' && (
+                    <Link
+                      to={`/plantings/${selectedPlanting.id}`}
+                      className="btn btn-primary"
+                      onClick={() => setSelectedPlanting(null)}
+                    >
+                      🌾 Log Harvest
+                    </Link>
+                  )}
+                  <button
+                    className="btn btn-outline"
+                    title="Plan a successor crop for this square"
+                    onClick={() => {
+                      const p = selectedPlanting
+                      setSelectedPlanting(null)
+                      setSquareChooser({
+                        x: p.square_x,
+                        y: p.square_y ?? 0,
+                        towerLevel: p.tower_level ?? undefined,
+                      })
+                    }}
+                  >
+                    ➕ Plan Next
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
