@@ -77,7 +77,7 @@ async def extract_seed_packet_data(
         client = anthropic.Anthropic(api_key=api_key)
 
         message = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-5",
             max_tokens=1024,
             messages=[
                 {
