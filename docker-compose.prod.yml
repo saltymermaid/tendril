@@ -37,6 +37,7 @@ services:
           memory: 512M
 
   backend:
+    image: ghcr.io/saltymermaid/tendril-backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile.prod
@@ -70,6 +71,7 @@ services:
           memory: 512M
 
   frontend:
+    image: ghcr.io/saltymermaid/tendril-frontend:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod

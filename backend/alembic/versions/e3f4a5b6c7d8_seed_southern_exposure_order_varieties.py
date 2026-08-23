@@ -133,10 +133,12 @@ def upgrade() -> None:
         {"email": OWNER_EMAIL},
     ).scalar_one_or_none()
     if owner_id is None:
-        raise RuntimeError(
-            f"No user found with email {OWNER_EMAIL!r}; refusing to seed varieties "
-            "without a target owner. Update OWNER_EMAIL in this migration and re-run."
-        )
+        # `alembic upgrade head` runs against schema-only databases too (CI's
+        # ephemeral test DB, a fresh dev/staging install before seeding) —
+        # those have no users yet, and that's expected, not an error. Skip
+        # seeding rather than failing the whole migration chain.
+        print(f"  No user found with email {OWNER_EMAIL!r}; skipping variety seed (nothing to do here).")
+        return
 
     # Categories: insert any that don't already exist (name is globally unique).
     cat_ids: dict[str, int] = {}
