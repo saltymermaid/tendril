@@ -9,6 +9,7 @@ Exposure Seed Exchange order to the account's catalog. Idempotent: skips any
 variety whose name already exists for the owner, and any category whose name
 already exists globally, so it's safe to re-run.
 """
+import os
 from typing import Sequence, Union
 
 import sqlalchemy as sa
@@ -20,7 +21,10 @@ down_revision: Union[str, None] = 'c1d2e3f4a5b6'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-OWNER_EMAIL = "msblades@gmail.com"
+# Same source as scripts/seed_production.py: the first address in
+# ALLOWED_EMAILS (set in docker-compose.prod.yml from the .env file).
+_allowed_emails_raw = os.environ.get("ALLOWED_EMAILS", "")
+OWNER_EMAIL = _allowed_emails_raw.split(",")[0].strip() if _allowed_emails_raw else None
 
 categories = sa.table(
     "categories",
@@ -128,6 +132,10 @@ def upgrade() -> None:
     bind = op.get_bind()
     session = Session(bind=bind)
 
+    if OWNER_EMAIL is None:
+        print("  ALLOWED_EMAILS not set; skipping variety seed (nothing to do here).")
+        return
+
     owner_id = session.execute(
         sa.text("SELECT id FROM users WHERE email = :email"),
         {"email": OWNER_EMAIL},
@@ -216,6 +224,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     bind = op.get_bind()
     session = Session(bind=bind)
+
+    if OWNER_EMAIL is None:
+        return
 
     owner_id = session.execute(
         sa.text("SELECT id FROM users WHERE email = :email"),
