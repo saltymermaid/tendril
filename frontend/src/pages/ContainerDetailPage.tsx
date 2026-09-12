@@ -380,9 +380,10 @@ export function ContainerDetailPage() {
     setSelectedCategory(null)
 
     // Compute smart default start_date:
-    // If there are existing plantings at this square → day after last end_date
+    // If there are existing plantings at this square → later of (day after last end_date) or today
     // If the square is empty → today
-    let defaultStartDate = new Date().toISOString().split('T')[0]
+    const todayStr = new Date().toISOString().split('T')[0]
+    let defaultStartDate = todayStr
     try {
       const res = await apiFetch(`/api/plantings/by-container/${id}`)
       if (res.ok) {
@@ -400,10 +401,11 @@ export function ContainerDetailPage() {
             (max, p) => (p.end_date > max ? p.end_date : max),
             squarePlantings[0].end_date
           )
-          // Start the day after the last planting ends
+          // Start the day after the last planting ends, but never in the past
           const [yr, mo, dy] = maxEndDate.split('-').map(Number)
           const next = new Date(yr, mo - 1, dy + 1)
-          defaultStartDate = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
+          const dayAfterEnd = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
+          defaultStartDate = dayAfterEnd > todayStr ? dayAfterEnd : todayStr
         }
       }
     } catch {
