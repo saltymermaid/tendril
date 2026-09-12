@@ -2003,6 +2003,65 @@ select.form-input {
   cursor: pointer;
 }
 
+/* No internal gridlines within — or between — placed objects: squares sit
+   flush and only true object edges keep a border (via is-multi-sq below). */
+.yard-grid-wrapper.display-mode .grid-row {
+  gap: 0;
+}
+
+.yard-grid-wrapper.display-mode .grid-square.is-multi-sq {
+  border-radius: 0;
+}
+
+.yard-grid-wrapper.display-mode .grid-square.is-multi-sq.multi-edge-top.multi-edge-left {
+  border-top-left-radius: var(--radius-sm);
+}
+
+.yard-grid-wrapper.display-mode .grid-square.is-multi-sq.multi-edge-top.multi-edge-right {
+  border-top-right-radius: var(--radius-sm);
+}
+
+.yard-grid-wrapper.display-mode .grid-square.is-multi-sq.multi-edge-bottom.multi-edge-left {
+  border-bottom-left-radius: var(--radius-sm);
+}
+
+.yard-grid-wrapper.display-mode .grid-square.is-multi-sq.multi-edge-bottom.multi-edge-right {
+  border-bottom-right-radius: var(--radius-sm);
+}
+
+/* Centered, larger object label — display mode only. Sized in JS (inline
+   style) to the object's full footprint so it reads as one label per
+   object rather than a per-square caption. */
+.yard-obj-label-centered {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 2px 4px;
+  pointer-events: none;
+}
+
+.yard-obj-icon-lg {
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+.yard-obj-name-lg {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: center;
+  line-height: 1.15;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Move banner */
 .yard-move-banner {
   display: flex;

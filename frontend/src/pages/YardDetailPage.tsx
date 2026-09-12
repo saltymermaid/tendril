@@ -33,6 +33,8 @@ interface ContainerOption {
   is_placed: boolean
 }
 
+const CELL_SIZE = 28 // px — matches .yard-grid-wrapper .grid-square in index.css
+
 const ROW_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 function rowLabel(y: number): string {
   return y < ROW_LABELS.length ? ROW_LABELS[y] : String(y + 1)
@@ -438,10 +440,24 @@ export function YardDetailPage() {
                     title={obj ? objectDisplayName(obj) : `${rowLabel(y)}${x + 1} — empty`}
                   >
                     {showContent && (
-                      <>
-                        <span className="yard-obj-icon">{OBJECT_ICONS[obj.object_type] || '📍'}</span>
-                        <span className="yard-obj-label">{objectDisplayName(obj)}</span>
-                      </>
+                      mode === 'display' ? (
+                        <div
+                          className="yard-obj-label-centered"
+                          style={{
+                            width: `${obj.square_width * CELL_SIZE}px`,
+                            height: `${obj.square_height * CELL_SIZE}px`,
+                            flexDirection: obj.square_height > 1 ? 'column' : 'row',
+                          }}
+                        >
+                          <span className="yard-obj-icon-lg">{OBJECT_ICONS[obj.object_type] || '📍'}</span>
+                          <span className="yard-obj-name-lg">{objectDisplayName(obj)}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="yard-obj-icon">{OBJECT_ICONS[obj.object_type] || '📍'}</span>
+                          <span className="yard-obj-label">{objectDisplayName(obj)}</span>
+                        </>
+                      )
                     )}
                   </div>
                 )
