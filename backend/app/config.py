@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     enable_dev_login: bool = False
 
     # JWT
-    access_token_expire_minutes: int = 15
+    access_token_expire_minutes: int = 720
     refresh_token_expire_days: int = 7
 
     # Cloudflare R2
