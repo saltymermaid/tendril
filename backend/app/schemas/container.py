@@ -61,6 +61,7 @@ class ContainerListResponse(BaseModel):
     levels: int | None = None
     pockets_per_level: int | None = None
     irrigation_type: str | None = None
+    is_placed: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -69,5 +70,6 @@ class ContainerDetailResponse(ContainerBase):
     id: int
     user_id: int
     square_supports: list[SquareSupportResponse] = []
+    yard_id: int | None = None
 
     model_config = {"from_attributes": True}

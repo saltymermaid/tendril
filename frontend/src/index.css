@@ -1948,6 +1948,135 @@ select.form-input {
 .grid-square.is-multi-sq.not-started.multi-edge-left   { border-left-style: dashed; }
 .grid-square.is-multi-sq.not-started.multi-edge-right  { border-right-style: dashed; }
 
+/* ── Yard Layout ── */
+
+/* Yards are typically much wider than a single bed — fixed-size cells in a
+   scrollable wrapper instead of the bed grid's percentage-based sizing. */
+.yard-grid-wrapper {
+  display: block;
+  background: var(--color-earth-100);
+  border: 2px solid var(--color-earth-300);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  overflow-x: auto;
+}
+
+.yard-grid-wrapper .grid-header-row,
+.yard-grid-wrapper .grid-row {
+  width: max-content;
+}
+
+.yard-grid-wrapper .grid-square,
+.yard-grid-wrapper .grid-col-label,
+.yard-grid-wrapper .grid-row-label {
+  flex: none;
+  width: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  font-size: var(--text-sm);
+}
+
+.grid-square.yard-empty {
+  background: var(--color-earth-50);
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+/* Display mode — a clean map: no coordinates, empty squares recede,
+   only occupied squares (beds especially) read as clickable. */
+.yard-grid-wrapper.display-mode .grid-header-row,
+.yard-grid-wrapper.display-mode .grid-row-label,
+.yard-grid-wrapper.display-mode .grid-corner {
+  display: none;
+}
+
+.yard-grid-wrapper.display-mode .grid-square {
+  cursor: default;
+}
+
+.yard-grid-wrapper.display-mode .grid-square.yard-empty {
+  background: transparent;
+  border-color: transparent;
+}
+
+.yard-grid-wrapper.display-mode .grid-square:not(.yard-empty) {
+  cursor: pointer;
+}
+
+/* Move banner */
+.yard-move-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  background: #fef3c7;
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.yard-move-banner .yard-move-error {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+/* Color/border applies to both grid squares and .legend-swatch chips */
+.yard-obj-bed {
+  background: var(--color-green-100);
+  border-color: var(--color-green-500);
+}
+
+.yard-obj-path {
+  background: var(--color-gray-200);
+  border-color: var(--color-gray-400);
+}
+
+.yard-obj-mulch {
+  background: var(--color-earth-200);
+  border-color: var(--color-earth-500);
+}
+
+.yard-obj-building {
+  background: var(--color-gray-300);
+  border-color: var(--color-gray-600);
+}
+
+.yard-obj-tree {
+  background: var(--color-green-200);
+  border-color: var(--color-green-800);
+}
+
+.yard-obj-water {
+  background: #dbeafe;
+  border-color: #3b82f6;
+}
+
+.yard-obj-other {
+  background: var(--color-gray-100);
+  border-color: var(--color-gray-400);
+}
+
+.grid-square .yard-obj-icon {
+  font-size: var(--text-base);
+  pointer-events: none;
+}
+
+.grid-square .yard-obj-label {
+  position: absolute;
+  bottom: 1px;
+  left: 2px;
+  right: 2px;
+  font-size: 0.55rem;
+  line-height: 1;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
 /* Tower pocket states */
 .tower-pocket.planted {
   border-width: 2px;

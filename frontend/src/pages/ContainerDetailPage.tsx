@@ -24,6 +24,7 @@ interface ContainerDetail {
   irrigation_duration_minutes: number | null
   irrigation_frequency: string | null
   square_supports: SquareSupport[]
+  yard_id: number | null
 }
 
 interface PlantingData {
@@ -573,6 +574,11 @@ export function ContainerDetailPage() {
             </span>
           </div>
           <div className="page-header-actions">
+            {container.yard_id && (
+              <Link to={`/yards/${container.yard_id}`} className="btn btn-outline-dark btn-sm">
+                🗺️ View in Yard
+              </Link>
+            )}
             <Link to={`/containers/${id}/edit`} className="btn btn-outline-dark btn-sm">
               Edit
             </Link>

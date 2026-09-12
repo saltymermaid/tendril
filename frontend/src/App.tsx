@@ -13,6 +13,9 @@ import { VarietyFormPage } from '@/pages/VarietyFormPage'
 import { ContainersPage } from '@/pages/ContainersPage'
 import { ContainerDetailPage } from '@/pages/ContainerDetailPage'
 import { ContainerFormPage } from '@/pages/ContainerFormPage'
+import { YardsPage } from '@/pages/YardsPage'
+import { YardDetailPage } from '@/pages/YardDetailPage'
+import { YardFormPage } from '@/pages/YardFormPage'
 import { PlantingDetailPage } from '@/pages/PlantingDetailPage'
 import { GardenOverviewPage } from '@/pages/GardenOverviewPage'
 import { TimelinePage } from '@/pages/TimelinePage'
@@ -46,6 +49,10 @@ function App() {
             <Route path="/containers/new" element={<ContainerFormPage />} />
             <Route path="/containers/:id" element={<ContainerDetailPage />} />
             <Route path="/containers/:id/edit" element={<ContainerFormPage />} />
+            <Route path="/yards" element={<YardsPage />} />
+            <Route path="/yards/new" element={<YardFormPage />} />
+            <Route path="/yards/:id" element={<YardDetailPage />} />
+            <Route path="/yards/:id/edit" element={<YardFormPage />} />
             <Route path="/plantings/:id" element={<PlantingDetailPage />} />
             <Route path="/tasks" element={<TasksPage />} />
           </Route>

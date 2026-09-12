@@ -4,6 +4,7 @@ from app.models.user import User
 from app.models.category import Category, PlantingSeason, CompanionRule
 from app.models.variety import Variety
 from app.models.container import Container, SquareSupport
+from app.models.yard import Yard, YardObject
 from app.models.planting import Planting
 from app.models.event import Event
 from app.models.journal_note import JournalNote
@@ -18,6 +19,8 @@ __all__ = [
     "Variety",
     "Container",
     "SquareSupport",
+    "Yard",
+    "YardObject",
     "Planting",
     "Event",
     "JournalNote",

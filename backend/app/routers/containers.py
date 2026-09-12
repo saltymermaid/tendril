@@ -13,6 +13,7 @@ from app.models.container import Container, SquareSupport
 from app.models.planting import Planting
 from app.models.variety import Variety
 from app.models.user import User
+from app.models.yard import YardObject
 from app.schemas.container import (
     ContainerCreate,
     ContainerDetailResponse,
@@ -131,7 +132,19 @@ async def list_containers(
         .order_by(Container.name)
     )
     result = await db.execute(stmt)
-    return result.scalars().all()
+    containers = result.scalars().all()
+
+    placed_result = await db.execute(
+        select(YardObject.container_id).where(YardObject.container_id.isnot(None))
+    )
+    placed_ids = {row[0] for row in placed_result.all()}
+
+    return [
+        ContainerListResponse.model_validate(c, from_attributes=True).model_copy(
+            update={"is_placed": c.id in placed_ids}
+        )
+        for c in containers
+    ]
 
 
 @router.get("/{container_id}", response_model=ContainerDetailResponse)
@@ -155,7 +168,14 @@ async def get_container(
             detail="Container not found",
         )
 
-    return container
+    yard_result = await db.execute(
+        select(YardObject.yard_id).where(YardObject.container_id == container_id)
+    )
+    yard_id = yard_result.scalar_one_or_none()
+
+    return ContainerDetailResponse.model_validate(container, from_attributes=True).model_copy(
+        update={"yard_id": yard_id}
+    )
 
 
 @router.post("", response_model=ContainerDetailResponse, status_code=status.HTTP_201_CREATED)
