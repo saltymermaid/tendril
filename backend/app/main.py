@@ -8,10 +8,14 @@ from starlette.middleware.sessions import SessionMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.config import get_settings
+from app.mcp.auth_middleware import McpBearerAuthMiddleware
+from app.mcp.server import mcp_asgi_app, mcp_server
 from app.routers.auth import router as auth_router
 from app.routers.categories import router as categories_router
 from app.routers.containers import router as containers_router
 from app.routers.events import router as events_router
+from app.routers.mcp_auth import router as mcp_auth_router
+from app.routers.mcp_wellknown import router as mcp_wellknown_router
 from app.routers.notes import router as notes_router
 from app.routers.plantings import router as plantings_router
 from app.routers.recommendations import router as recommendations_router
@@ -25,10 +29,14 @@ from app.routers.yards import router as yards_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan handler for startup/shutdown events."""
-    # Startup
-    yield
-    # Shutdown
+    """Application lifespan handler for startup/shutdown events.
+
+    Mounting the MCP Streamable HTTP sub-app via app.mount() does not propagate ASGI
+    lifespan events to it, so its session manager's task group is run explicitly here
+    instead — the documented pattern for embedding an MCPServer in a larger app.
+    """
+    async with mcp_server.session_manager.run():
+        yield
 
 
 settings = get_settings()
@@ -69,6 +77,17 @@ app.include_router(varieties_router)
 app.include_router(weather_router)
 app.include_router(push_router)
 app.include_router(yards_router)
+app.include_router(mcp_auth_router)
+app.include_router(mcp_wellknown_router)
+
+# MCP server for the Claude.ai connector, reachable at /api/mcp/rpc. Mounted at /api/mcp
+# with the sub-app's own route at /rpc (rather than mounting at /api/mcp/rpc with the
+# sub-app's route at /) so a request to exactly /api/mcp/rpc matches directly instead of
+# 307-redirecting to add a trailing slash, which is Starlette's behavior when a mount's
+# own root is requested with no trailing slash. Routes registered above (mcp_auth_router,
+# mcp_wellknown_router) are matched first for their exact paths — Starlette checks routes
+# in registration order — so this mount can't swallow /api/mcp/authorize or /api/mcp/token.
+app.mount("/api/mcp", McpBearerAuthMiddleware(mcp_asgi_app))
 
 
 @app.get("/api/health")

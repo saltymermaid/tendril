@@ -32,6 +32,11 @@ services:
       ENABLE_DEV_LOGIN: ${ENABLE_DEV_LOGIN:-true}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
       DEBUG: ${DEBUG:-true}
+      BASE_URL: ${BASE_URL:-}
+      MCP_CLIENT_ID: ${MCP_CLIENT_ID:-}
+      MCP_CLIENT_SECRET: ${MCP_CLIENT_SECRET:-}
+      MCP_TOKEN_SECRET: ${MCP_TOKEN_SECRET:-}
+      MCP_ALLOWED_REDIRECT_URIS: ${MCP_ALLOWED_REDIRECT_URIS:-https://claude.ai/api/mcp/auth_callback}
     depends_on:
       db:
         condition: service_healthy

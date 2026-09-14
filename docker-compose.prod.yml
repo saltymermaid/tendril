@@ -59,6 +59,10 @@ services:
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      MCP_CLIENT_ID: ${MCP_CLIENT_ID:-}
+      MCP_CLIENT_SECRET: ${MCP_CLIENT_SECRET:-}
+      MCP_TOKEN_SECRET: ${MCP_TOKEN_SECRET:-}
+      MCP_ALLOWED_REDIRECT_URIS: ${MCP_ALLOWED_REDIRECT_URIS:-https://claude.ai/api/mcp/auth_callback}
     depends_on:
       db:
         condition: service_healthy

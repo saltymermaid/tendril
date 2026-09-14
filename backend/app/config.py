@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"  # Comma-separated
     base_url: str = ""  # e.g. https://tendril.garden — used to build OAuth redirect URIs
 
+    # MCP server (Claude.ai custom connector)
+    mcp_client_id: str = ""
+    mcp_client_secret: str = ""
+    mcp_token_secret: str = ""  # dedicated JWT signing key — never shared with secret_key
+    mcp_access_token_expire_minutes: int = 60
+    mcp_refresh_token_expire_days: int = 90
+    mcp_auth_code_expire_seconds: int = 300
+    mcp_allowed_redirect_uris: str = "https://claude.ai/api/mcp/auth_callback"  # Comma-separated
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @property
@@ -51,6 +60,11 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         """Parse comma-separated CORS origins into a list."""
         return [origin.strip() for origin in self.cors_origins.split(",")]
+
+    @property
+    def mcp_allowed_redirect_uris_list(self) -> list[str]:
+        """Parse comma-separated MCP redirect URIs into a list."""
+        return [uri.strip() for uri in self.mcp_allowed_redirect_uris.split(",") if uri.strip()]
 
 
 @lru_cache

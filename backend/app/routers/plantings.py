@@ -106,6 +106,42 @@ async def _load_planting_with_relations(db: AsyncSession, planting_id: int) -> P
     return result.scalar_one_or_none()
 
 
+def validate_planting_bounds(
+    container: Container,
+    square_x: int,
+    square_y: int,
+    square_width: int,
+    square_height: int,
+    tower_level: int | None,
+) -> None:
+    """Validate that a planting's position fits within its container's bounds.
+
+    Shared by the REST create route and the MCP create_planting tool so the two
+    entry points can't drift apart.
+    """
+    if container.type == "grid_bed":
+        if (
+            square_x < 0
+            or square_y < 0
+            or square_x + square_width > container.width
+            or square_y + square_height > container.height
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Planting extends beyond container bounds "
+                f"({container.width}x{container.height})",
+            )
+
+    if container.type == "tower":
+        if tower_level is None:
+            raise HTTPException(status_code=400, detail="tower_level required for tower containers")
+        if tower_level < 0 or tower_level >= container.levels:
+            raise HTTPException(
+                status_code=400,
+                detail=f"tower_level must be 0-{container.levels - 1}",
+            )
+
+
 async def _check_overlap(
     db: AsyncSession,
     user_id: int,
@@ -191,27 +227,14 @@ async def create_planting(
     if body.end_date <= body.start_date:
         raise HTTPException(status_code=400, detail="end_date must be after start_date")
 
-    if container.type == "grid_bed":
-        if (
-            body.square_x < 0
-            or body.square_y < 0
-            or body.square_x + body.square_width > container.width
-            or body.square_y + body.square_height > container.height
-        ):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Planting extends beyond container bounds "
-                f"({container.width}x{container.height})",
-            )
-
-    if container.type == "tower":
-        if body.tower_level is None:
-            raise HTTPException(status_code=400, detail="tower_level required for tower containers")
-        if body.tower_level < 0 or body.tower_level >= container.levels:
-            raise HTTPException(
-                status_code=400,
-                detail=f"tower_level must be 0-{container.levels - 1}",
-            )
+    validate_planting_bounds(
+        container=container,
+        square_x=body.square_x,
+        square_y=body.square_y,
+        square_width=body.square_width,
+        square_height=body.square_height,
+        tower_level=body.tower_level,
+    )
 
     await _check_overlap(
         db=db,

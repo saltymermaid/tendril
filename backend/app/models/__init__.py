@@ -10,6 +10,7 @@ from app.models.event import Event
 from app.models.journal_note import JournalNote
 from app.models.task import Task
 from app.models.push_subscription import PushSubscription
+from app.models.mcp_auth import McpAuthorizationCode, McpRefreshToken
 
 __all__ = [
     "User",
@@ -26,4 +27,6 @@ __all__ = [
     "JournalNote",
     "Task",
     "PushSubscription",
+    "McpAuthorizationCode",
+    "McpRefreshToken",
 ]

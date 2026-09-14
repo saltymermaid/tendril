@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
+from app.routers.mcp_auth import SESSION_REDIRECT_KEY
 from app.schemas.auth import AuthStatusResponse, DevLoginRequest, UserResponse
 from app.services.auth import (
     create_access_token,
@@ -161,9 +162,12 @@ async def google_callback(
     timeout_hours: int | None = (user.settings or {}).get("session_timeout_hours")
     _set_auth_cookies(response, user.id, session_timeout_hours=timeout_hours)
 
-    # Redirect to frontend after successful login
+    # If this login was triggered by the MCP /authorize flow, bounce back there
+    # so it can issue an authorization code now that a session cookie exists.
+    mcp_redirect = request.session.pop(SESSION_REDIRECT_KEY, None)
+
     response.status_code = status.HTTP_302_FOUND
-    response.headers["location"] = "/"
+    response.headers["location"] = mcp_redirect or "/"
     return response
 
 
