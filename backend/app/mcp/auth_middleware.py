@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 
 from app.config import get_settings
 from app.mcp.context import current_mcp_user_id
-from app.services.mcp_auth import decode_mcp_token
+from app.services.mcp_auth import canonical_resource_url, decode_mcp_token
 
 settings = get_settings()
 
@@ -43,6 +43,10 @@ class McpBearerAuthMiddleware:
             if payload and payload.get("type") != "mcp_access":
                 payload = None
             if payload and payload.get("exp") and payload["exp"] < datetime.now(timezone.utc).timestamp():
+                payload = None
+            # MCP spec: servers MUST validate the token's audience is specifically this
+            # resource server, and reject tokens that don't include it.
+            if payload and payload.get("aud") != canonical_resource_url():
                 payload = None
 
         if not payload:

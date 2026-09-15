@@ -25,14 +25,41 @@ MCP_ACCESS_TOKEN_TYPE = "mcp_access"
 MCP_REFRESH_TOKEN_TYPE = "mcp_refresh"
 
 
+def canonical_resource_url() -> str:
+    """The MCP server's own canonical resource URI (RFC 8707 / MCP auth spec).
+
+    Tendril has exactly one MCP resource, so this is a fixed value rather than
+    something tracked per authorization/token grant.
+    """
+    return f"{settings.base_url.rstrip('/')}/api/mcp/rpc"
+
+
+def validate_resource_param(resource: str | None) -> None:
+    """Validate an OAuth `resource` parameter against our one canonical resource URI.
+
+    The MCP spec requires clients to send `resource` on both the authorization and
+    token requests, and requires servers to validate it (RFC 8707). Raises ValueError
+    with a message suitable for an `invalid_target` error response if it doesn't match.
+    A missing `resource` is accepted for backwards compatibility with older clients,
+    but the issued token is still audience-bound to our one resource regardless.
+    """
+    if resource is not None and resource.rstrip("/") != canonical_resource_url():
+        raise ValueError(f"resource must be {canonical_resource_url()}")
+
+
 def create_mcp_access_token(user_id: int, client_id: str) -> str:
-    """Create a short-lived MCP access token (stateless JWT, verified on every /api/mcp/rpc call)."""
+    """Create a short-lived MCP access token (stateless JWT, verified on every /api/mcp/rpc call).
+
+    Always carries `aud` bound to our one canonical resource URI, per the MCP spec's
+    audience-validation requirement — independent of whether the client sent `resource`.
+    """
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.mcp_access_token_expire_minutes)
     payload = {
         "sub": str(user_id),
         "client_id": client_id,
         "type": MCP_ACCESS_TOKEN_TYPE,
         "scope": "read write",
+        "aud": canonical_resource_url(),
         "exp": expire,
         "iat": datetime.now(timezone.utc),
     }
@@ -66,9 +93,18 @@ async def create_mcp_refresh_token(db: AsyncSession, user_id: int, client_id: st
 
 
 def decode_mcp_token(token: str) -> dict | None:
-    """Decode and validate an MCP JWT. Returns payload or None if invalid/expired."""
+    """Decode and validate an MCP JWT. Returns payload or None if invalid/expired.
+
+    Audience (`aud`) is deliberately not checked here via PyJWT's built-in `audience=`
+    kwarg — that requires every caller to know and pass the expected audience, but this
+    function also decodes refresh tokens, which carry no `aud` at all. Callers that need
+    audience validation (the bearer middleware, for access tokens) check `payload["aud"]`
+    themselves after calling this.
+    """
     try:
-        return jwt.decode(token, settings.mcp_token_secret, algorithms=[ALGORITHM])
+        return jwt.decode(
+            token, settings.mcp_token_secret, algorithms=[ALGORITHM], options={"verify_aud": False}
+        )
     except jwt.InvalidTokenError:
         return None
 

@@ -24,6 +24,7 @@ from app.services.mcp_auth import (
     redeem_authorization_code,
     redeem_refresh_token,
     revoke_refresh_token,
+    validate_resource_param,
     verify_pkce,
 )
 
@@ -42,6 +43,7 @@ async def authorize(
     code_challenge: str = Query(...),
     code_challenge_method: str = Query(...),
     state: str | None = Query(default=None),
+    resource: str | None = Query(default=None),
     access_token: str | None = Cookie(default=None),
     db: AsyncSession = Depends(get_db),
 ):
@@ -55,6 +57,10 @@ async def authorize(
         raise HTTPException(status_code=400, detail="redirect_uri not allowed")
     if code_challenge_method != "S256":
         raise HTTPException(status_code=400, detail="code_challenge_method must be S256")
+    try:
+        validate_resource_param(resource)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     user = None
     if access_token:
@@ -90,6 +96,7 @@ async def token(
     redirect_uri: str | None = Form(default=None),
     code_verifier: str | None = Form(default=None),
     refresh_token: str | None = Form(default=None),
+    resource: str | None = Form(default=None),
     client_id: str = Form(...),
     client_secret: str = Form(...),
     db: AsyncSession = Depends(get_db),
@@ -99,6 +106,10 @@ async def token(
         client_secret, settings.mcp_client_secret
     ):
         raise HTTPException(status_code=401, detail="invalid_client")
+    try:
+        validate_resource_param(resource)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     if grant_type == "authorization_code":
         if not code or not redirect_uri or not code_verifier:
