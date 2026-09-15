@@ -137,6 +137,14 @@
   --text-muted: var(--color-text-secondary);
   --text-secondary: var(--color-text-secondary);
   --primary-light: var(--color-primary-light);
+
+  /* Green "tint" backgrounds — used for hover/selected states that sit behind
+     default-colored text (--color-text etc). Unlike --color-green-50/100 (which
+     stay light in both themes, by design, for badges pairing a light bg with a
+     fixed dark-green text color), these are meant to flip dark so text using the
+     theme-aware text tokens stays readable on top of them. */
+  --color-green-tint: var(--color-green-50);
+  --color-green-tint-strong: var(--color-green-100);
 }
 
 /* ── Dark Mode Tokens ── */
@@ -178,6 +186,9 @@
     --text-primary: var(--color-text);
     --text-muted: var(--color-text-secondary);
     --text-secondary: var(--color-text-secondary);
+
+    --color-green-tint: var(--color-gray-100);
+    --color-green-tint-strong: var(--color-gray-200);
   }
 }
 
@@ -1240,7 +1251,7 @@ select.form-input {
 }
 
 .companion-tag.good:hover {
-  background-color: var(--color-green-50);
+  background-color: var(--color-green-tint);
 }
 
 .companion-tag.bad {
@@ -1680,7 +1691,7 @@ select.form-input {
 
 .grid-square:hover {
   border-color: var(--color-primary-light);
-  background: var(--color-green-50);
+  background: var(--color-green-tint);
 }
 
 .grid-square.selected {
@@ -1689,7 +1700,7 @@ select.form-input {
 }
 
 .grid-square.has-support {
-  background: var(--color-green-50);
+  background: var(--color-green-tint);
   border-color: var(--color-green-300);
 }
 
@@ -1704,7 +1715,7 @@ select.form-input {
   left: 50%;
   transform: translateX(-50%);
   z-index: 200;
-  background: #ffffff;
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
@@ -1729,7 +1740,7 @@ select.form-input {
 }
 
 .support-menu button:hover {
-  background: var(--color-green-50);
+  background: var(--color-green-tint);
   color: var(--color-primary);
 }
 
@@ -1840,7 +1851,7 @@ select.form-input {
 
 .type-option.selected {
   border-color: var(--color-primary);
-  background: var(--color-green-50);
+  background: var(--color-green-tint);
 }
 
 .type-option .type-emoji {
@@ -2083,7 +2094,7 @@ select.form-input {
 
 /* Color/border applies to both grid squares and .legend-swatch chips */
 .yard-obj-bed {
-  background: var(--color-green-100);
+  background: var(--color-green-tint-strong);
   border-color: var(--color-green-500);
 }
 
@@ -2103,7 +2114,7 @@ select.form-input {
 }
 
 .yard-obj-tree {
-  background: var(--color-green-200);
+  background: var(--color-green-tint-strong);
   border-color: var(--color-green-800);
 }
 
@@ -2416,11 +2427,11 @@ select.form-input {
 }
 
 .variety-picker-item:hover {
-  background: var(--color-green-50);
+  background: var(--color-green-tint);
 }
 
 .variety-picker-item.selected {
-  background: var(--color-green-100);
+  background: var(--color-green-tint-strong);
   font-weight: 600;
 }
 
@@ -2724,7 +2735,7 @@ select.form-input {
 }
 
 .time-slider-btn:hover {
-  background: var(--color-green-50);
+  background: var(--color-green-tint);
   border-color: var(--color-green-300);
 }
 
@@ -2928,7 +2939,7 @@ select.form-input {
 
 .square-chooser-btn:hover {
   border-color: var(--color-green-400);
-  background: var(--color-green-50);
+  background: var(--color-green-tint);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
@@ -3022,7 +3033,7 @@ select.form-input {
 }
 
 .rec-variety-item:hover {
-  background: var(--color-green-50);
+  background: var(--color-green-tint);
 }
 
 .rec-variety-header {
@@ -3343,7 +3354,7 @@ select.form-input {
 
 .photo-import-card {
   border: 2px dashed var(--border);
-  background: var(--color-green-50);
+  background: var(--color-green-tint);
 }
 
 .photo-import-buttons {
@@ -3685,7 +3696,7 @@ select.form-input {
 }
 
 .weather-day-today {
-  background: var(--color-green-50);
+  background: var(--color-green-tint);
   border: 1px solid var(--color-green-200);
 }
 
@@ -3768,7 +3779,7 @@ select.form-input {
 }
 
 .stat-card-btn:hover {
-  background: var(--color-green-50);
+  background: var(--color-green-tint);
   border-color: var(--color-primary);
   box-shadow: 0 2px 8px rgba(21, 128, 61, 0.15);
   transform: translateY(-1px);
