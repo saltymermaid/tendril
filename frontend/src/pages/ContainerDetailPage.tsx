@@ -538,6 +538,8 @@ export function ContainerDetailPage() {
     return matchesSearch && matchesCategory
   })
 
+  const selectedVarietyObj = varieties.find(v => v.id === selectedVariety) || null
+
   const matchingStarts = plantStarts.filter((s: PlantStart) => s.variety_id === selectedVariety)
 
   function selectStart(s: PlantStart) {
@@ -942,60 +944,93 @@ export function ContainerDetailPage() {
             <form onSubmit={handleCreatePlanting}>
               <div className="form-group">
                 <label className="form-label">Variety *</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Search varieties..."
-                  value={varietySearch}
-                  onChange={(e) => setVarietySearch(e.target.value)}
-                />
-                {categories.length > 0 && (
-                  <div className="category-filter-chips">
+                {selectedVarietyObj ? (
+                  <div className="variety-picker-summary">
+                    <span
+                      className="variety-picker-dot"
+                      style={{ backgroundColor: selectedVarietyObj.category_color || '#ccc' }}
+                    />
+                    <span className="variety-picker-name">{selectedVarietyObj.name}</span>
+                    <span className="variety-picker-category">{selectedVarietyObj.category_name}</span>
                     <button
                       type="button"
-                      className={`chip ${!selectedCategory ? 'active' : ''}`}
-                      onClick={() => setSelectedCategory(null)}
+                      className="btn-link"
+                      onClick={() => {
+                        setSelectedVariety(null)
+                        setSelectedStartId(null)
+                      }}
                     >
-                      All
+                      Change
                     </button>
-                    {categories.map((c: Category) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className={`chip ${selectedCategory === c.id ? 'active' : ''}`}
-                        style={selectedCategory === c.id ? { backgroundColor: c.color, color: '#fff' } : undefined}
-                        onClick={() => setSelectedCategory(c.id)}
-                      >
-                        {c.name}
-                      </button>
-                    ))}
                   </div>
-                )}
-                <div className="variety-picker-list">
-                  {filteredVarieties.length === 0 ? (
-                    <p className="text-muted" style={{ padding: 'var(--space-2)' }}>
-                      No varieties found. <Link to="/catalog/varieties/new">Add one</Link>
-                    </p>
-                  ) : (
-                    filteredVarieties.map((v: Variety) => (
-                      <div
-                        key={v.id}
-                        className={`variety-picker-item ${selectedVariety === v.id ? 'selected' : ''}`}
-                        onClick={() => {
-                          setSelectedVariety(v.id)
-                          setSelectedStartId(null)
-                        }}
-                      >
-                        <span
-                          className="variety-picker-dot"
-                          style={{ backgroundColor: v.category_color || '#ccc' }}
-                        />
-                        <span className="variety-picker-name">{v.name}</span>
-                        <span className="variety-picker-category">{v.category_name}</span>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Search varieties..."
+                      value={varietySearch}
+                      onChange={(e) => setVarietySearch(e.target.value)}
+                      autoFocus
+                    />
+
+                    {!varietySearch && !selectedCategory && categories.length > 0 && (
+                      <div className="category-tile-grid">
+                        {categories.map((c: Category) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className="category-tile"
+                            style={{ borderColor: c.color }}
+                            onClick={() => setSelectedCategory(c.id)}
+                          >
+                            <span className="category-tile-dot" style={{ backgroundColor: c.color }} />
+                            {c.name}
+                          </button>
+                        ))}
                       </div>
-                    ))
-                  )}
-                </div>
+                    )}
+
+                    {(varietySearch || selectedCategory) && (
+                      <>
+                        {selectedCategory && (
+                          <button
+                            type="button"
+                            className="chip category-back-chip"
+                            onClick={() => setSelectedCategory(null)}
+                          >
+                            ← {categories.find(c => c.id === selectedCategory)?.name || 'All categories'}
+                          </button>
+                        )}
+                        <div className="variety-picker-list">
+                          {filteredVarieties.length === 0 ? (
+                            <p className="text-muted" style={{ padding: 'var(--space-2)' }}>
+                              No varieties found. <Link to="/catalog/varieties/new">Add one</Link>
+                            </p>
+                          ) : (
+                            filteredVarieties.map((v: Variety) => (
+                              <div
+                                key={v.id}
+                                className="variety-picker-item"
+                                onClick={() => {
+                                  setSelectedVariety(v.id)
+                                  setSelectedStartId(null)
+                                }}
+                              >
+                                <span
+                                  className="variety-picker-dot"
+                                  style={{ backgroundColor: v.category_color || '#ccc' }}
+                                />
+                                <span className="variety-picker-name">{v.name}</span>
+                                <span className="variety-picker-category">{v.category_name}</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
               </div>
 
               <div className="form-row">
