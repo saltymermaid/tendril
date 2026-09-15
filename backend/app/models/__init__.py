@@ -5,6 +5,7 @@ from app.models.category import Category, PlantingSeason, CompanionRule
 from app.models.variety import Variety
 from app.models.container import Container, SquareSupport
 from app.models.yard import Yard, YardObject
+from app.models.plant_start import PlantStart
 from app.models.planting import Planting
 from app.models.event import Event
 from app.models.journal_note import JournalNote
@@ -22,6 +23,7 @@ __all__ = [
     "SquareSupport",
     "Yard",
     "YardObject",
+    "PlantStart",
     "Planting",
     "Event",
     "JournalNote",

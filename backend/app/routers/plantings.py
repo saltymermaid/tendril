@@ -11,6 +11,7 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.container import Container
 from app.models.event import Event
+from app.models.plant_start import PlantStart
 from app.models.planting import Planting
 from app.models.user import User
 from app.models.variety import Variety
@@ -84,6 +85,7 @@ def _planting_to_response(p: Planting) -> PlantingResponse:
         planting_method=p.planting_method,
         quantity=p.quantity,
         removal_reason=p.removal_reason,
+        start_id=p.start_id,
         variety_name=variety_name,
         category_name=category_name,
         category_color=category_color,
@@ -196,6 +198,36 @@ async def _check_overlap(
             )
 
 
+async def _consume_plant_start(
+    db: AsyncSession,
+    user_id: int,
+    start_id: int,
+    variety_id: int,
+    quantity: int,
+) -> PlantStart:
+    """Validate and decrement a Plant Start being transplanted into a bed.
+
+    Shared by the REST create route and the MCP create_planting tool so the two
+    entry points can't drift apart. Does not commit — caller commits as part of
+    the planting-creation transaction.
+    """
+    result = await db.execute(
+        select(PlantStart).where(PlantStart.id == start_id, PlantStart.user_id == user_id)
+    )
+    start = result.scalar_one_or_none()
+    if not start:
+        raise HTTPException(status_code=404, detail="Plant Start not found")
+
+    if start.variety_id != variety_id:
+        raise HTTPException(status_code=400, detail="Start is for a different variety")
+
+    if quantity > start.quantity:
+        raise HTTPException(status_code=400, detail="Not enough remaining in this start")
+
+    start.quantity -= quantity
+    return start
+
+
 # --- Create planting ---
 @router.post("", response_model=PlantingResponse, status_code=status.HTTP_201_CREATED)
 async def create_planting(
@@ -248,6 +280,15 @@ async def create_planting(
         end_date=body.end_date,
     )
 
+    if body.start_id is not None:
+        await _consume_plant_start(
+            db=db,
+            user_id=current_user.id,
+            start_id=body.start_id,
+            variety_id=body.variety_id,
+            quantity=body.quantity or 1,
+        )
+
     planting = Planting(
         user_id=current_user.id,
         container_id=body.container_id,
@@ -261,6 +302,7 @@ async def create_planting(
         end_date=body.end_date,
         planting_method=body.planting_method,
         quantity=body.quantity,
+        start_id=body.start_id,
         status="not_started",
     )
     db.add(planting)

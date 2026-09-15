@@ -32,6 +32,7 @@ class User(Base):
     containers: Mapped[list["Container"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # noqa: F821
     yards: Mapped[list["Yard"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # noqa: F821
     plantings: Mapped[list["Planting"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # noqa: F821
+    plant_starts: Mapped[list["PlantStart"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # noqa: F821
     events: Mapped[list["Event"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # noqa: F821
     journal_notes: Mapped[list["JournalNote"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # noqa: F821
     tasks: Mapped[list["Task"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # noqa: F821

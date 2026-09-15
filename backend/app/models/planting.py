@@ -17,6 +17,9 @@ class Planting(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     container_id: Mapped[int] = mapped_column(ForeignKey("containers.id", ondelete="CASCADE"), nullable=False)
     variety_id: Mapped[int] = mapped_column(ForeignKey("varieties.id", ondelete="CASCADE"), nullable=False)
+    start_id: Mapped[int | None] = mapped_column(
+        ForeignKey("plant_starts.id", ondelete="SET NULL"), nullable=True
+    )  # The Plant Start this was transplanted from, if any
 
     # Position
     square_x: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -51,6 +54,7 @@ class Planting(Base):
     user: Mapped["User"] = relationship(back_populates="plantings")  # noqa: F821
     container: Mapped["Container"] = relationship(back_populates="plantings")  # noqa: F821
     variety: Mapped["Variety"] = relationship(back_populates="plantings")  # noqa: F821
+    plant_start: Mapped["PlantStart | None"] = relationship(back_populates="plantings")  # noqa: F821
     events: Mapped[list["Event"]] = relationship(back_populates="planting")  # noqa: F821
     journal_notes: Mapped[list["JournalNote"]] = relationship(back_populates="planting")  # noqa: F821
     tasks: Mapped[list["Task"]] = relationship(back_populates="planting")  # noqa: F821

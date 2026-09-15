@@ -1,6 +1,6 @@
 """Narrow write MCP tools — create a planting, complete a planting, create a task,
-change a task's status. No deletes, no variety/container/yard mutations, by design
-(see the plan's confirmed v1 write scope).
+change a task's status, create a plant start. No deletes, no variety/container/yard/plant-start
+mutations beyond creation, by design (see the plan's confirmed v1 write scope).
 
 Validation is reused, not duplicated: `_check_overlap` and `validate_planting_bounds`
 are imported directly from the REST plantings router so the two entry points can't
@@ -21,11 +21,12 @@ from app.database import async_session
 from app.mcp.server import mcp_server
 from app.mcp.context import get_mcp_user
 from app.models.container import Container
+from app.models.plant_start import PlantStart
 from app.models.planting import Planting
 from app.models.task import Task
 from app.models.variety import Variety
-from app.mcp.tools_read import _planting_dict
-from app.routers.plantings import _check_overlap, validate_planting_bounds
+from app.mcp.tools_read import _planting_dict, _plant_start_dict
+from app.routers.plantings import _check_overlap, _consume_plant_start, validate_planting_bounds
 
 VALID_REMOVAL_REASONS = {"harvest_complete", "died", "pulled_early", "pest_disease", "other"}
 
@@ -43,10 +44,13 @@ async def create_planting(
     tower_level: int | None = None,
     planting_method: str | None = None,
     quantity: int | None = None,
+    start_id: int | None = None,
 ) -> dict:
     """Create a new planting — assign a variety to a square (or squares) of a container
     for a date range. Rejects overlaps with existing plantings on the same squares/dates
-    and positions outside the container's bounds."""
+    and positions outside the container's bounds. If start_id is given, decrements that
+    many (quantity, default 1) from the referenced plant start — it must be for the same
+    variety and have enough remaining."""
     async with async_session() as db:
         user = await get_mcp_user(db)
 
@@ -85,6 +89,14 @@ async def create_planting(
                 start_date=start_date,
                 end_date=end_date,
             )
+            if start_id is not None:
+                await _consume_plant_start(
+                    db=db,
+                    user_id=user.id,
+                    start_id=start_id,
+                    variety_id=variety_id,
+                    quantity=quantity or 1,
+                )
         except HTTPException as exc:
             raise ToolError(exc.detail) from exc
 
@@ -101,6 +113,7 @@ async def create_planting(
             end_date=end_date,
             planting_method=planting_method,
             quantity=quantity,
+            start_id=start_id,
             status="not_started",
         )
         db.add(planting)
@@ -156,6 +169,27 @@ async def complete_planting(
         )
         loaded = result.scalar_one()
         return _planting_dict(loaded)
+
+
+@mcp_server.tool()
+async def create_plant_start(variety_id: int, start_date: date, quantity: int = 1) -> dict:
+    """Record a new plant start — a batch of seedlings started (e.g. in trays), not yet
+    assigned to a bed. Pick these up later via start_id when calling create_planting."""
+    async with async_session() as db:
+        user = await get_mcp_user(db)
+
+        result = await db.execute(select(Variety).where(Variety.id == variety_id, Variety.user_id == user.id))
+        if not result.scalar_one_or_none():
+            raise ToolError(f"Variety {variety_id} not found")
+
+        start = PlantStart(user_id=user.id, variety_id=variety_id, start_date=start_date, quantity=quantity)
+        db.add(start)
+        await db.commit()
+
+        result = await db.execute(
+            select(PlantStart).options(selectinload(PlantStart.variety)).where(PlantStart.id == start.id)
+        )
+        return _plant_start_dict(result.scalar_one())
 
 
 @mcp_server.tool()

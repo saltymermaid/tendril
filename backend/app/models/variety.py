@@ -59,6 +59,7 @@ class Variety(Base):
     user: Mapped["User"] = relationship(back_populates="varieties")  # noqa: F821
     category: Mapped["Category"] = relationship(back_populates="varieties")  # noqa: F821
     plantings: Mapped[list["Planting"]] = relationship(back_populates="variety")  # noqa: F821
+    plant_starts: Mapped[list["PlantStart"]] = relationship(back_populates="variety")  # noqa: F821
 
     def __repr__(self) -> str:
         return f"<Variety(id={self.id}, name='{self.name}', category_id={self.category_id})>"

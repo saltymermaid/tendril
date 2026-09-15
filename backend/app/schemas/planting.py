@@ -17,6 +17,7 @@ class PlantingBase(BaseModel):
     end_date: date
     planting_method: str | None = None  # direct_sow, transplant
     quantity: int | None = None
+    start_id: int | None = None  # Plant Start this was transplanted from, if any
 
 
 class PlantingCreate(PlantingBase):
@@ -71,6 +72,7 @@ class PlantingResponse(BaseModel):
     planting_method: str | None = None
     quantity: int | None = None
     removal_reason: str | None = None
+    start_id: int | None = None
 
     # Joined fields
     variety_name: str | None = None

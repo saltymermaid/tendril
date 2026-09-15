@@ -27,6 +27,7 @@ export function AppLayout() {
           <NavLink to="/overview" className="nav-link">Overview</NavLink>
           <NavLink to="/timeline" className="nav-link">Timeline</NavLink>
           <NavLink to="/catalog" className="nav-link">Catalog</NavLink>
+          <NavLink to="/starts" className="nav-link">Starts</NavLink>
           <NavLink to="/containers" className="nav-link">Containers</NavLink>
           <NavLink to="/yards" className="nav-link">Yards</NavLink>
           <NavLink to="/tasks" className="nav-link">Tasks</NavLink>
@@ -60,6 +61,7 @@ export function AppLayout() {
             <NavLink to="/overview" className="mobile-nav-link" onClick={closeMenu}>Overview</NavLink>
             <NavLink to="/timeline" className="mobile-nav-link" onClick={closeMenu}>Timeline</NavLink>
             <NavLink to="/catalog" className="mobile-nav-link" onClick={closeMenu}>Catalog</NavLink>
+            <NavLink to="/starts" className="mobile-nav-link" onClick={closeMenu}>Starts</NavLink>
             <NavLink to="/containers" className="mobile-nav-link" onClick={closeMenu}>Containers</NavLink>
             <NavLink to="/yards" className="mobile-nav-link" onClick={closeMenu}>Yards</NavLink>
             <NavLink to="/tasks" className="mobile-nav-link" onClick={closeMenu}>Tasks</NavLink>

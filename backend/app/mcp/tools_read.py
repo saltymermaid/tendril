@@ -17,6 +17,7 @@ from app.database import async_session
 from app.mcp.server import mcp_server
 from app.mcp.context import get_mcp_user
 from app.models.container import Container
+from app.models.plant_start import PlantStart
 from app.models.planting import Planting
 from app.models.task import Task
 from app.models.variety import Variety
@@ -67,6 +68,35 @@ async def list_varieties(category_id: int | None = None, limit: int = DEFAULT_LI
             stmt = stmt.where(Variety.category_id == category_id)
         result = await db.execute(stmt)
         return [_variety_dict(v) for v in result.scalars().all()]
+
+
+def _plant_start_dict(s: PlantStart) -> dict:
+    return {
+        "id": s.id,
+        "variety_id": s.variety_id,
+        "variety_name": s.variety.name if s.variety else None,
+        "start_date": _iso(s.start_date),
+        "quantity": s.quantity,
+    }
+
+
+@mcp_server.tool()
+async def list_plant_starts(include_used: bool = False, limit: int = DEFAULT_LIST_LIMIT) -> list[dict]:
+    """List the user's plant starts (started seedlings not yet assigned to a bed), newest
+    first. Excludes used-up (quantity 0) starts unless include_used is set."""
+    async with async_session() as db:
+        user = await get_mcp_user(db)
+        stmt = (
+            select(PlantStart)
+            .options(selectinload(PlantStart.variety))
+            .where(PlantStart.user_id == user.id)
+            .order_by(PlantStart.start_date.desc())
+            .limit(limit)
+        )
+        if not include_used:
+            stmt = stmt.where(PlantStart.quantity > 0)
+        result = await db.execute(stmt)
+        return [_plant_start_dict(s) for s in result.scalars().all()]
 
 
 @mcp_server.tool()
@@ -217,6 +247,7 @@ def _planting_dict(p: Planting) -> dict:
         "planting_method": p.planting_method,
         "quantity": p.quantity,
         "removal_reason": p.removal_reason,
+        "start_id": p.start_id,
         "lifecycle": lifecycle,
     }
 

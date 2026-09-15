@@ -56,6 +56,16 @@ interface Variety {
   days_to_harvest_max: number | null
 }
 
+interface PlantStart {
+  id: number
+  variety_id: number
+  variety_name: string | null
+  category_name: string | null
+  category_color: string | null
+  start_date: string
+  quantity: number
+}
+
 interface Category {
   id: number
   name: string
@@ -137,6 +147,8 @@ export function ContainerDetailPage() {
   const [varietySearch, setVarietySearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [selectedVariety, setSelectedVariety] = useState<number | null>(null)
+  const [plantStarts, setPlantStarts] = useState<PlantStart[]>([])
+  const [selectedStartId, setSelectedStartId] = useState<number | null>(null)
   const [plantingForm, setPlantingForm] = useState({
     start_date: new Date().toISOString().split('T')[0],
     end_date: '',
@@ -157,6 +169,7 @@ export function ContainerDetailPage() {
     const endDate = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`
     setPlantingForm(prev => ({ ...prev, end_date: endDate }))
   }, [selectedVariety, plantingForm.start_date])
+
   const [plantingError, setPlantingError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -184,6 +197,10 @@ export function ContainerDetailPage() {
 
   // Square action chooser (plant vs recommend)
   const [squareChooser, setSquareChooser] = useState<{ x: number; y: number; towerLevel?: number } | null>(null)
+
+  // Start-first picker (choose a started seedling, then land in the planting form pre-filled)
+  const [startPickerModal, setStartPickerModal] = useState<{ x: number; y: number; towerLevel?: number } | null>(null)
+  const [startPickerCategory, setStartPickerCategory] = useState<string | null>(null)
 
   const fetchContainer = useCallback(async () => {
     try {
@@ -240,6 +257,15 @@ export function ContainerDetailPage() {
       ])
       if (varRes.ok) setVarieties(await varRes.json())
       if (catRes.ok) setCategories(await catRes.json())
+    } catch {
+      // Non-critical
+    }
+  }
+
+  async function fetchPlantStarts() {
+    try {
+      const res = await apiFetch('/api/plant-starts')
+      if (res.ok) setPlantStarts(await res.json())
     } catch {
       // Non-critical
     }
@@ -377,6 +403,7 @@ export function ContainerDetailPage() {
     setPlantingModal({ x, y, towerLevel })
     setPlantingError('')
     setSelectedVariety(null)
+    setSelectedStartId(null)
     setVarietySearch('')
     setSelectedCategory(null)
 
@@ -422,6 +449,30 @@ export function ContainerDetailPage() {
       square_height: 1,
     })
     fetchVarietiesAndCategories()
+    fetchPlantStarts()
+  }
+
+  function openStartPicker(x: number, y: number, towerLevel?: number) {
+    setStartPickerModal({ x, y, towerLevel })
+    setStartPickerCategory(null)
+    fetchPlantStarts()
+  }
+
+  async function chooseStart(s: PlantStart, modal: { x: number; y: number; towerLevel?: number }) {
+    setStartPickerModal(null)
+    await openPlantingModal(modal.x, modal.y, modal.towerLevel)
+    // openPlantingModal fires its variety fetch without awaiting it — wait for it explicitly
+    // here so the auto end-date effect has variety.days_to_harvest data by the time we set
+    // selectedVariety below (it bails out silently if `varieties` is still empty).
+    await fetchVarietiesAndCategories()
+    setSelectedVariety(s.variety_id)
+    setSelectedStartId(s.id)
+    setPlantingForm(prev => ({
+      ...prev,
+      planting_method: 'transplant',
+      start_date: s.start_date,
+      quantity: String(Math.min(1, s.quantity)),
+    }))
   }
 
   async function handleCreatePlanting(e: React.FormEvent) {
@@ -452,6 +503,9 @@ export function ContainerDetailPage() {
       if (plantingForm.quantity) {
         body.quantity = Number(plantingForm.quantity)
       }
+      if (selectedStartId) {
+        body.start_id = selectedStartId
+      }
 
       const res = await apiFetch('/api/plantings', {
         method: 'POST',
@@ -466,6 +520,9 @@ export function ContainerDetailPage() {
 
       setPlantingModal(null)
       fetchPlantings()
+      if (selectedStartId) {
+        fetchPlantStarts()
+      }
     } catch (err: unknown) {
       setPlantingError(err instanceof Error ? err.message : 'Failed to create planting')
     } finally {
@@ -480,6 +537,34 @@ export function ContainerDetailPage() {
     const matchesCategory = !selectedCategory || v.category_id === selectedCategory
     return matchesSearch && matchesCategory
   })
+
+  const matchingStarts = plantStarts.filter((s: PlantStart) => s.variety_id === selectedVariety)
+
+  function selectStart(s: PlantStart) {
+    if (selectedStartId === s.id) {
+      setSelectedStartId(null)
+      return
+    }
+    setSelectedStartId(s.id)
+    setPlantingForm(prev => ({
+      ...prev,
+      start_date: s.start_date,
+      quantity: String(Math.min(Number(prev.quantity) || 1, s.quantity)),
+    }))
+  }
+
+  function formatStartDate(dateStr: string): string {
+    const [yr, mo, dy] = dateStr.split('-').map(Number)
+    return new Date(yr, mo - 1, dy).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  const activeStarts = plantStarts.filter((s: PlantStart) => s.quantity > 0)
+  const startPickerCategories = Array.from(
+    new Map(activeStarts.map((s: PlantStart) => [s.category_name || 'Uncategorized', s.category_color || '#ccc'])).entries()
+  ).sort((a, b) => a[0].localeCompare(b[0]))
+  const filteredStarts = activeStarts.filter(
+    (s: PlantStart) => !startPickerCategory || (s.category_name || 'Uncategorized') === startPickerCategory
+  )
 
   function computeNextAvailable(x: number, y: number): string {
     // Find the latest end_date of any planting occupying this square
@@ -896,7 +981,10 @@ export function ContainerDetailPage() {
                       <div
                         key={v.id}
                         className={`variety-picker-item ${selectedVariety === v.id ? 'selected' : ''}`}
-                        onClick={() => setSelectedVariety(v.id)}
+                        onClick={() => {
+                          setSelectedVariety(v.id)
+                          setSelectedStartId(null)
+                        }}
                       >
                         <span
                           className="variety-picker-dot"
@@ -972,7 +1060,11 @@ export function ContainerDetailPage() {
                   <select
                     className="form-input"
                     value={plantingForm.planting_method}
-                    onChange={(e) => setPlantingForm({ ...plantingForm, planting_method: e.target.value })}
+                    onChange={(e) => {
+                      const method = e.target.value
+                      setPlantingForm({ ...plantingForm, planting_method: method })
+                      if (method !== 'transplant') setSelectedStartId(null)
+                    }}
                   >
                     <option value="">—</option>
                     <option value="direct_sow">Direct Sow</option>
@@ -985,8 +1077,14 @@ export function ContainerDetailPage() {
                     type="number"
                     className="form-input"
                     min="1"
+                    max={selectedStartId ? matchingStarts.find(s => s.id === selectedStartId)?.quantity : undefined}
                     value={plantingForm.quantity}
-                    onChange={(e) => setPlantingForm({ ...plantingForm, quantity: e.target.value })}
+                    onChange={(e) => {
+                      const cap = selectedStartId ? matchingStarts.find(s => s.id === selectedStartId)?.quantity : undefined
+                      const raw = e.target.value
+                      const clamped = cap && Number(raw) > cap ? String(cap) : raw
+                      setPlantingForm({ ...plantingForm, quantity: clamped })
+                    }}
                     placeholder="Optional"
                     autoComplete="off"
                     data-1p-ignore
@@ -994,6 +1092,29 @@ export function ContainerDetailPage() {
                   />
                 </div>
               </div>
+
+              {plantingForm.planting_method === 'transplant' && matchingStarts.length > 0 && (
+                <div className="form-group">
+                  <label className="form-label">Plant From a Start</label>
+                  <div className="variety-picker-list" style={{ maxHeight: '140px' }}>
+                    {matchingStarts.map((s: PlantStart) => (
+                      <div
+                        key={s.id}
+                        className={`variety-picker-item ${selectedStartId === s.id ? 'selected' : ''}`}
+                        onClick={() => selectStart(s)}
+                      >
+                        <span className="variety-picker-name">Started {formatStartDate(s.start_date)}</span>
+                        <span className="variety-picker-category">{s.quantity} available</span>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedStartId && (
+                    <p className="text-muted">
+                      Start Date set from this start's seed date — end date recalculated accordingly.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {plantingError && <div className="form-message error">{plantingError}</div>}
 
@@ -1212,6 +1333,18 @@ export function ContainerDetailPage() {
                 onClick={() => {
                   const { x, y, towerLevel } = squareChooser
                   setSquareChooser(null)
+                  openStartPicker(x, y, towerLevel)
+                }}
+              >
+                <span className="chooser-icon">🌿</span>
+                <span className="chooser-label">Plant Something From a Start</span>
+                <span className="chooser-desc">Transplant a seedling you've already started</span>
+              </button>
+              <button
+                className="square-chooser-btn"
+                onClick={() => {
+                  const { x, y, towerLevel } = squareChooser
+                  setSquareChooser(null)
                   openPlantingModal(x, y, towerLevel)
                 }}
               >
@@ -1232,6 +1365,77 @@ export function ContainerDetailPage() {
                 <span className="chooser-desc">Get recommendations based on season & companions</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Start Picker Modal — pick a started seedling, then land in the planting form pre-filled */}
+      {startPickerModal && (
+        <div className="modal-overlay" onClick={() => setStartPickerModal(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>
+                Plant From a Start —{' '}
+                {startPickerModal.towerLevel !== undefined
+                  ? `Level ${startPickerModal.towerLevel + 1}, Pocket ${startPickerModal.x + 1}`
+                  : `${ROW_LABELS[startPickerModal.y]}${startPickerModal.x + 1}`}
+              </h3>
+              <button className="modal-close" onClick={() => setStartPickerModal(null)}>✕</button>
+            </div>
+
+            {activeStarts.length === 0 ? (
+              <div className="empty-state">
+                <span className="empty-icon">🌱</span>
+                <h3>No active starts</h3>
+                <p>You haven't recorded any started plants yet.</p>
+                <Link to="/starts" className="btn btn-primary" onClick={() => setStartPickerModal(null)}>
+                  Go to Starts
+                </Link>
+              </div>
+            ) : (
+              <>
+                {startPickerCategories.length > 1 && (
+                  <div className="category-filter-chips">
+                    <button
+                      type="button"
+                      className={`chip ${!startPickerCategory ? 'active' : ''}`}
+                      onClick={() => setStartPickerCategory(null)}
+                    >
+                      All
+                    </button>
+                    {startPickerCategories.map(([name, color]) => (
+                      <button
+                        key={name}
+                        type="button"
+                        className={`chip ${startPickerCategory === name ? 'active' : ''}`}
+                        style={startPickerCategory === name ? { backgroundColor: color, color: '#fff' } : undefined}
+                        onClick={() => setStartPickerCategory(name)}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="variety-picker-list">
+                  {filteredStarts.map((s: PlantStart) => (
+                    <div
+                      key={s.id}
+                      className="variety-picker-item"
+                      onClick={() => chooseStart(s, startPickerModal)}
+                    >
+                      <span
+                        className="variety-picker-dot"
+                        style={{ backgroundColor: s.category_color || '#ccc' }}
+                      />
+                      <span className="variety-picker-name">{s.variety_name}</span>
+                      <span className="variety-picker-category">
+                        Started {formatStartDate(s.start_date)} · {s.quantity} available
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
