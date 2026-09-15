@@ -4637,50 +4637,12 @@ select.form-input {
   }
 }
 
-/* ── Bottom Navigation for Mobile PWA ── */
+/* Keep the header visible while scrolling in the installed PWA */
 @media (max-width: 640px) and (display-mode: standalone) {
   .app-header {
     position: sticky;
     top: 0;
     z-index: 50;
-  }
-
-  .header-nav {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: var(--color-surface);
-    border-top: 1px solid var(--color-border);
-    padding: var(--space-1) var(--space-2);
-    padding-bottom: calc(var(--space-1) + var(--safe-area-bottom));
-    z-index: 50;
-    justify-content: space-around;
-    gap: 0;
-  }
-
-  .header-nav .nav-link {
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-xs);
-    padding: var(--space-1);
-    flex-direction: column;
-    gap: 2px;
-    text-align: center;
-    border-radius: var(--radius-sm);
-  }
-
-  .header-nav .nav-link.active {
-    color: var(--color-primary);
-    background: var(--color-green-50);
-  }
-
-  .header-nav .nav-link:hover {
-    color: var(--color-primary);
-    background: transparent;
-  }
-
-  .app-main {
-    padding-bottom: calc(var(--space-8) + 60px + var(--safe-area-bottom));
   }
 }
 
