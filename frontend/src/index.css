@@ -4133,10 +4133,6 @@ select.form-input {
 
 /* iOS safe area insets for standalone mode */
 @supports (padding: env(safe-area-inset-top)) {
-  .app-header {
-    padding-top: env(safe-area-inset-top);
-  }
-
   .app-layout {
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
