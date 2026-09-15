@@ -224,6 +224,27 @@ jobs:
           # Clean up old images
           docker image prune -f
 
-          # Verify health (frontend on FRONTEND_PORT=3000)
-          sleep 10
-          curl -sf http://localhost:3000/api/health || echo "WARNING: Health check failed"
+          # Verify health. Ask compose for the actual published port instead of
+          # assuming FRONTEND_PORT=3000 — this check has failed on every deploy
+          # since at least 2026-09-12, and a stale/incorrect port assumption vs.
+          # amphitrite's real .env is one plausible cause. Also poll for up to
+          # 30s instead of a single flat sleep(10), since "Started" in the
+          # compose output above just means the container was created, not that
+          # the app inside has finished booting.
+          frontend_port=$(docker compose -f docker-compose.prod.yml port frontend 80 | cut -d: -f2)
+          health_url="http://localhost:${frontend_port}/api/health"
+          echo "Checking $health_url"
+          ok=false
+          for i in $(seq 1 15); do
+            if curl -sf "$health_url" > /dev/null; then
+              ok=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ok" = true ]; then
+            echo "Health check passed"
+          else
+            echo "::warning::Health check failed after 30s against $health_url — see verbose output below"
+            curl -sv "$health_url" || true
+          fi
