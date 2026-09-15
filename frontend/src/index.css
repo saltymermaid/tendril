@@ -126,6 +126,9 @@
   --safe-area-left: env(safe-area-inset-left, 0px);
   --safe-area-right: env(safe-area-inset-right, 0px);
 
+  /* App header: base content height, excluding safe-area inset */
+  --header-height: 56px;
+
   /* Legacy aliases for lifecycle/removal components */
   --surface: var(--color-surface);
   --surface-hover: var(--color-gray-50);
@@ -264,7 +267,7 @@ button, a, select, input[type="checkbox"], input[type="radio"],
 .app-header {
   background: linear-gradient(135deg, var(--color-green-800), var(--color-green-600));
   color: white;
-  height: 56px;
+  min-height: var(--header-height);
   position: relative;
   display: flex;
   align-items: center;
@@ -703,7 +706,7 @@ textarea.form-input {
 /* Mobile menu overlay */
 .mobile-menu-overlay {
   position: fixed;
-  inset: 56px 0 0 0;
+  inset: calc(var(--header-height) + var(--safe-area-top)) 0 0 0;
   z-index: 200;
   background: rgba(0, 0, 0, 0.4);
 }
@@ -3904,6 +3907,7 @@ select.form-input {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  min-width: 0;
 }
 
 .dashboard-card {
