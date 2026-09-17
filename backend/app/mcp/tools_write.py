@@ -1,6 +1,8 @@
-"""Narrow write MCP tools — create a planting, complete a planting, create a task,
-change a task's status, create a plant start. No deletes, no variety/container/yard/plant-start
-mutations beyond creation, by design (see the plan's confirmed v1 write scope).
+"""Narrow write MCP tools — create/update varieties and categories, create a planting,
+complete a planting, create a task, change a task's status, create a plant start. Still
+no deletes and no container/yard/plant-start mutations beyond creation, by design (see
+the plan's confirmed v1 write scope) — variety and category writes were added on top of
+that scope so the catalog can be maintained from an MCP client.
 
 Validation is reused, not duplicated: `_check_overlap` and `validate_planting_bounds`
 are imported directly from the REST plantings router so the two entry points can't
@@ -20,15 +22,158 @@ from sqlalchemy.orm import selectinload
 from app.database import async_session
 from app.mcp.server import mcp_server
 from app.mcp.context import get_mcp_user
+from app.models.category import Category, PlantingSeason
 from app.models.container import Container
 from app.models.plant_start import PlantStart
 from app.models.planting import Planting
 from app.models.task import Task
 from app.models.variety import Variety
-from app.mcp.tools_read import _planting_dict, _plant_start_dict
+from app.mcp.tools_read import _category_dict, _get_category_detail, _planting_dict, _plant_start_dict, _variety_dict
 from app.routers.plantings import _check_overlap, _consume_plant_start, validate_planting_bounds
 
 VALID_REMOVAL_REASONS = {"harvest_complete", "died", "pulled_early", "pest_disease", "other"}
+VALID_PLANTING_METHODS = {"direct_sow", "transplant", "both"}
+VALID_HARVEST_TYPES = {"single", "continuous"}
+
+
+def _planting_season_from_dict(category_id: int, ps: dict) -> PlantingSeason:
+    try:
+        return PlantingSeason(
+            category_id=category_id,
+            usda_zone=ps["usda_zone"],
+            start_month=ps["start_month"],
+            start_day=ps["start_day"],
+            end_month=ps["end_month"],
+            end_day=ps["end_day"],
+        )
+    except KeyError as exc:
+        raise ToolError(
+            f"planting_seasons entry missing required field {exc}. Each entry needs "
+            "usda_zone, start_month, start_day, end_month, end_day."
+        ) from exc
+
+
+@mcp_server.tool()
+async def create_variety(
+    name: str,
+    category_id: int,
+    days_to_germination_min: int | None = None,
+    days_to_germination_max: int | None = None,
+    days_to_harvest_min: int | None = None,
+    days_to_harvest_max: int | None = None,
+    seed_start_days: int | None = None,
+    planting_depth: str | None = None,
+    spacing: str = "1x1",
+    sunlight: str | None = None,
+    is_climbing: bool = False,
+    planting_method: str = "both",
+    source_url: str | None = None,
+    notes: str | None = None,
+) -> dict:
+    """Add a new plant variety to the catalog under an existing category (see
+    list_categories for category_id). days_to_harvest is measured from seed, not from
+    transplant. planting_method must be one of: direct_sow, transplant, both."""
+    if planting_method not in VALID_PLANTING_METHODS:
+        raise ToolError(f"planting_method must be one of: {', '.join(sorted(VALID_PLANTING_METHODS))}")
+
+    async with async_session() as db:
+        user = await get_mcp_user(db)
+
+        result = await db.execute(select(Category).where(Category.id == category_id))
+        if not result.scalar_one_or_none():
+            raise ToolError(f"Category {category_id} not found")
+
+        variety = Variety(
+            user_id=user.id,
+            category_id=category_id,
+            name=name,
+            days_to_germination_min=days_to_germination_min,
+            days_to_germination_max=days_to_germination_max,
+            days_to_harvest_min=days_to_harvest_min,
+            days_to_harvest_max=days_to_harvest_max,
+            seed_start_days=seed_start_days,
+            planting_depth=planting_depth,
+            spacing=spacing,
+            sunlight=sunlight,
+            is_climbing=is_climbing,
+            planting_method=planting_method,
+            source_url=source_url,
+            notes=notes,
+        )
+        db.add(variety)
+        await db.commit()
+        await db.refresh(variety)
+
+        result = await db.execute(
+            select(Variety).options(selectinload(Variety.category)).where(Variety.id == variety.id)
+        )
+        return _variety_dict(result.scalar_one())
+
+
+@mcp_server.tool()
+async def update_variety(
+    variety_id: int,
+    name: str | None = None,
+    category_id: int | None = None,
+    days_to_germination_min: int | None = None,
+    days_to_germination_max: int | None = None,
+    days_to_harvest_min: int | None = None,
+    days_to_harvest_max: int | None = None,
+    seed_start_days: int | None = None,
+    planting_depth: str | None = None,
+    spacing: str | None = None,
+    sunlight: str | None = None,
+    is_climbing: bool | None = None,
+    planting_method: str | None = None,
+    source_url: str | None = None,
+    notes: str | None = None,
+) -> dict:
+    """Update a variety's fields — only the ones you pass are changed. planting_method,
+    if given, must be one of: direct_sow, transplant, both. Note: passing a field with
+    value None leaves it unchanged rather than clearing it (no way to blank out an
+    already-set field through this tool)."""
+    if planting_method is not None and planting_method not in VALID_PLANTING_METHODS:
+        raise ToolError(f"planting_method must be one of: {', '.join(sorted(VALID_PLANTING_METHODS))}")
+
+    async with async_session() as db:
+        user = await get_mcp_user(db)
+
+        result = await db.execute(select(Variety).where(Variety.id == variety_id, Variety.user_id == user.id))
+        variety = result.scalar_one_or_none()
+        if not variety:
+            raise ToolError(f"Variety {variety_id} not found")
+
+        if category_id is not None and category_id != variety.category_id:
+            cat_result = await db.execute(select(Category).where(Category.id == category_id))
+            if not cat_result.scalar_one_or_none():
+                raise ToolError(f"Category {category_id} not found")
+
+        updates = {
+            "name": name,
+            "category_id": category_id,
+            "days_to_germination_min": days_to_germination_min,
+            "days_to_germination_max": days_to_germination_max,
+            "days_to_harvest_min": days_to_harvest_min,
+            "days_to_harvest_max": days_to_harvest_max,
+            "seed_start_days": seed_start_days,
+            "planting_depth": planting_depth,
+            "spacing": spacing,
+            "sunlight": sunlight,
+            "is_climbing": is_climbing,
+            "planting_method": planting_method,
+            "source_url": source_url,
+            "notes": notes,
+        }
+        for field, value in updates.items():
+            if value is not None:
+                setattr(variety, field, value)
+
+        await db.commit()
+
+        result = await db.execute(
+            select(Variety).options(selectinload(Variety.category)).where(Variety.id == variety_id)
+        )
+        return _variety_dict(result.scalar_one())
 
 
 @mcp_server.tool()
@@ -245,3 +390,89 @@ async def update_task_status(task_id: int, status: str) -> dict:
         task.status = status
         await db.commit()
         return {"id": task.id, "title": task.title, "status": task.status}
+
+
+@mcp_server.tool()
+async def create_category(
+    name: str,
+    color: str,
+    harvest_type: str = "continuous",
+    icon_svg: str | None = None,
+    planting_seasons: list[dict] | None = None,
+) -> dict:
+    """Add a new plant category to the catalog (global — shared across every user of this
+    Tendril instance, like Tomatoes or Peppers). color is a hex string like '#FF5733'.
+    harvest_type must be 'single' (one harvest ends the planting, e.g. a head of lettuce)
+    or 'continuous' (repeated harvests over time, e.g. tomatoes). Each planting_seasons
+    entry needs usda_zone, start_month, start_day, end_month, end_day — this garden is
+    Zone 10a."""
+    if harvest_type not in VALID_HARVEST_TYPES:
+        raise ToolError(f"harvest_type must be one of: {', '.join(sorted(VALID_HARVEST_TYPES))}")
+
+    async with async_session() as db:
+        await get_mcp_user(db)
+
+        existing = await db.execute(select(Category).where(Category.name == name))
+        if existing.scalar_one_or_none():
+            raise ToolError(f"Category '{name}' already exists")
+
+        category = Category(name=name, color=color, harvest_type=harvest_type, icon_svg=icon_svg)
+        db.add(category)
+        await db.flush()
+
+        for ps in planting_seasons or []:
+            db.add(_planting_season_from_dict(category.id, ps))
+
+        await db.commit()
+
+        loaded = await _get_category_detail(db, category.id)
+        return _category_dict(loaded)
+
+
+@mcp_server.tool()
+async def update_category(
+    category_id: int,
+    name: str | None = None,
+    color: str | None = None,
+    harvest_type: str | None = None,
+    icon_svg: str | None = None,
+    planting_seasons: list[dict] | None = None,
+) -> dict:
+    """Update a category's fields — only the ones you pass are changed. Passing
+    planting_seasons replaces the category's entire season list (each entry needs
+    usda_zone, start_month, start_day, end_month, end_day)."""
+    if harvest_type is not None and harvest_type not in VALID_HARVEST_TYPES:
+        raise ToolError(f"harvest_type must be one of: {', '.join(sorted(VALID_HARVEST_TYPES))}")
+
+    async with async_session() as db:
+        await get_mcp_user(db)
+
+        result = await db.execute(
+            select(Category).options(selectinload(Category.planting_seasons)).where(Category.id == category_id)
+        )
+        category = result.scalar_one_or_none()
+        if not category:
+            raise ToolError(f"Category {category_id} not found")
+
+        if name is not None and name != category.name:
+            dup = await db.execute(select(Category).where(Category.name == name, Category.id != category_id))
+            if dup.scalar_one_or_none():
+                raise ToolError(f"Category '{name}' already exists")
+            category.name = name
+        if color is not None:
+            category.color = color
+        if harvest_type is not None:
+            category.harvest_type = harvest_type
+        if icon_svg is not None:
+            category.icon_svg = icon_svg
+
+        if planting_seasons is not None:
+            for ps in category.planting_seasons:
+                await db.delete(ps)
+            for ps in planting_seasons:
+                db.add(_planting_season_from_dict(category.id, ps))
+
+        await db.commit()
+
+        loaded = await _get_category_detail(db, category_id)
+        return _category_dict(loaded)

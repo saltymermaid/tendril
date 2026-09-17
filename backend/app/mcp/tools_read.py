@@ -8,7 +8,8 @@ relying on the tool-result serializer to know how.
 
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from mcp.server.mcpserver.exceptions import ToolError
@@ -16,6 +17,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from app.database import async_session
 from app.mcp.server import mcp_server
 from app.mcp.context import get_mcp_user
+from app.models.category import Category, CompanionRule
 from app.models.container import Container
 from app.models.plant_start import PlantStart
 from app.models.planting import Planting
@@ -68,6 +70,102 @@ async def list_varieties(category_id: int | None = None, limit: int = DEFAULT_LI
             stmt = stmt.where(Variety.category_id == category_id)
         result = await db.execute(stmt)
         return [_variety_dict(v) for v in result.scalars().all()]
+
+
+def _category_dict(c: Category) -> dict:
+    return {
+        "id": c.id,
+        "name": c.name,
+        "color": c.color,
+        "harvest_type": c.harvest_type,
+        "icon_svg": c.icon_svg,
+        "planting_seasons": [
+            {
+                "id": ps.id,
+                "usda_zone": ps.usda_zone,
+                "start_month": ps.start_month,
+                "start_day": ps.start_day,
+                "end_month": ps.end_month,
+                "end_day": ps.end_day,
+            }
+            for ps in c.planting_seasons
+        ],
+        "companion_rules": [
+            {
+                "id": r.id,
+                "companion_category_id": r.companion_category_id,
+                "companion_category_name": r.companion_category.name if r.companion_category else None,
+                "relationship_type": r.relationship_type,
+            }
+            for r in c.companion_rules
+        ],
+    }
+
+
+async def _get_category_detail(db: AsyncSession, category_id: int) -> Category | None:
+    """Shared by get_category and the create/update category write tools so all three
+    return the same shape."""
+    stmt = (
+        select(Category)
+        .options(
+            selectinload(Category.planting_seasons),
+            selectinload(Category.companion_rules).selectinload(CompanionRule.companion_category),
+        )
+        .where(Category.id == category_id)
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+@mcp_server.tool()
+async def list_categories() -> list[dict]:
+    """List all plant categories (global, shared across every user of this Tendril
+    instance — e.g. Tomatoes, Peppers), with the count of the current user's varieties
+    in each. Look here for a category's id before creating or filtering a variety."""
+    async with async_session() as db:
+        user = await get_mcp_user(db)
+        variety_count_sq = (
+            select(Variety.category_id, func.count(Variety.id).label("variety_count"))
+            .where(Variety.user_id == user.id)
+            .group_by(Variety.category_id)
+            .subquery()
+        )
+        stmt = (
+            select(
+                Category.id,
+                Category.name,
+                Category.color,
+                Category.harvest_type,
+                Category.icon_svg,
+                func.coalesce(variety_count_sq.c.variety_count, 0).label("variety_count"),
+            )
+            .outerjoin(variety_count_sq, Category.id == variety_count_sq.c.category_id)
+            .order_by(Category.name)
+        )
+        result = await db.execute(stmt)
+        return [
+            {
+                "id": row.id,
+                "name": row.name,
+                "color": row.color,
+                "harvest_type": row.harvest_type,
+                "icon_svg": row.icon_svg,
+                "variety_count": row.variety_count,
+            }
+            for row in result.all()
+        ]
+
+
+@mcp_server.tool()
+async def get_category(category_id: int) -> dict:
+    """Get a category's detail, including its Zone 10a planting seasons and companion
+    planting rules with other categories."""
+    async with async_session() as db:
+        await get_mcp_user(db)
+        category = await _get_category_detail(db, category_id)
+        if not category:
+            raise ToolError(f"Category {category_id} not found")
+        return _category_dict(category)
 
 
 def _plant_start_dict(s: PlantStart) -> dict:
