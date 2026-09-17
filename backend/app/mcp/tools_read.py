@@ -121,7 +121,9 @@ async def _get_category_detail(db: AsyncSession, category_id: int) -> Category |
 async def list_categories() -> list[dict]:
     """List all plant categories (global, shared across every user of this Tendril
     instance — e.g. Tomatoes, Peppers), with the count of the current user's varieties
-    in each. Look here for a category's id before creating or filtering a variety."""
+    in each. Look here for a category's id before creating or filtering a variety.
+    Omits icon_svg (some categories carry large hand-drawn icons) — call get_category
+    for a specific category's full icon markup."""
     async with async_session() as db:
         user = await get_mcp_user(db)
         variety_count_sq = (
@@ -136,7 +138,7 @@ async def list_categories() -> list[dict]:
                 Category.name,
                 Category.color,
                 Category.harvest_type,
-                Category.icon_svg,
+                Category.icon_svg.isnot(None).label("has_icon"),
                 func.coalesce(variety_count_sq.c.variety_count, 0).label("variety_count"),
             )
             .outerjoin(variety_count_sq, Category.id == variety_count_sq.c.category_id)
@@ -149,7 +151,7 @@ async def list_categories() -> list[dict]:
                 "name": row.name,
                 "color": row.color,
                 "harvest_type": row.harvest_type,
-                "icon_svg": row.icon_svg,
+                "has_icon": row.has_icon,
                 "variety_count": row.variety_count,
             }
             for row in result.all()
