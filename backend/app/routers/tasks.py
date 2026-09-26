@@ -9,14 +9,23 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models.task import Task
+from app.models.task import TASK_CATEGORIES, Task
 from app.models.user import User
 from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate
+from app.services.localtime import to_utc
 from app.services.task_generator import generate_tasks_for_user
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
 VALID_STATUSES = {"pending", "completed", "dismissed"}
+
+
+def _check_category(category: str | None) -> None:
+    if category is not None and category not in TASK_CATEGORIES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid category. Must be one of: {', '.join(sorted(TASK_CATEGORIES))}",
+        )
 
 
 def _task_to_response(task: Task) -> TaskResponse:
@@ -29,6 +38,9 @@ def _task_to_response(task: Task) -> TaskResponse:
         due_date=task.due_date,
         source=task.source,
         status=task.status,
+        category=task.category,
+        remind_at=task.remind_at,
+        reminder_sent=task.reminder_sent,
         container_id=task.container_id,
         planting_id=task.planting_id,
         variety_id=task.variety_id,
@@ -43,6 +55,7 @@ def _task_to_response(task: Task) -> TaskResponse:
 async def list_tasks(
     task_status: str | None = Query(default=None, alias="status", description="Filter by status"),
     source: str | None = Query(default=None, description="Filter by source (auto/manual)"),
+    category: str | None = Query(default=None, description="Filter by category"),
     start_date: date | None = Query(default=None, description="Due date range start"),
     end_date: date | None = Query(default=None, description="Due date range end"),
     db: AsyncSession = Depends(get_db),
@@ -60,6 +73,8 @@ async def list_tasks(
         stmt = stmt.where(Task.status == task_status)
     if source:
         stmt = stmt.where(Task.source == source)
+    if category:
+        stmt = stmt.where(Task.category == category)
     if start_date:
         stmt = stmt.where(Task.due_date >= start_date)
     if end_date:
@@ -77,12 +92,15 @@ async def create_task(
     current_user: User = Depends(get_current_user),
 ):
     """Create a manual task."""
+    _check_category(body.category)
     task = Task(
         user_id=current_user.id,
         title=body.title,
         description=body.description,
         due_date=body.due_date,
         source="manual",
+        category=body.category,
+        remind_at=to_utc(body.remind_at),
         container_id=body.container_id,
         planting_id=body.planting_id,
         variety_id=body.variety_id,
@@ -159,6 +177,12 @@ async def update_task(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid status. Must be one of: {', '.join(sorted(VALID_STATUSES))}",
         )
+    if "category" in update_data:
+        _check_category(update_data["category"])
+    if "remind_at" in update_data:
+        update_data["remind_at"] = to_utc(update_data["remind_at"])
+        # Rescheduling a reminder should let it fire again.
+        task.reminder_sent = False
 
     for field, value in update_data.items():
         setattr(task, field, value)

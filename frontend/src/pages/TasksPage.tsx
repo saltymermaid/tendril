@@ -10,6 +10,9 @@ interface TaskData {
   due_date: string | null
   source: string
   status: string
+  category: string
+  remind_at: string | null
+  reminder_sent: boolean
   container_id: number | null
   planting_id: number | null
   variety_id: number | null
@@ -23,6 +26,8 @@ interface TaskFormData {
   title: string
   description: string
   due_date: string
+  category: string
+  remind_at: string
   container_id: string
   planting_id: string
 }
@@ -30,6 +35,41 @@ interface TaskFormData {
 interface ContainerOption {
   id: number
   name: string
+}
+
+const TASK_CATEGORIES = [
+  'general',
+  'watering',
+  'harvest',
+  'planting',
+  'seed_starting',
+  'pest_disease',
+  'maintenance',
+] as const
+
+const CATEGORY_LABELS: Record<string, string> = {
+  general: 'General',
+  watering: 'Watering',
+  harvest: 'Harvest',
+  planting: 'Planting',
+  seed_starting: 'Seed Starting',
+  pest_disease: 'Pest / Disease',
+  maintenance: 'Maintenance',
+}
+
+const CATEGORY_ICONS: Record<string, string> = {
+  general: '📋',
+  watering: '💧',
+  harvest: '🌾',
+  planting: '🌱',
+  seed_starting: '🌿',
+  pest_disease: '🐛',
+  maintenance: '🔧',
+}
+
+function formatTime(isoStr: string): string {
+  const d = new Date(isoStr)
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
 function formatDate(dateStr: string): string {
@@ -116,6 +156,8 @@ export function TasksPage() {
     title: '',
     description: '',
     due_date: '',
+    category: 'general',
+    remind_at: '',
     container_id: '',
     planting_id: '',
   })
@@ -211,9 +253,10 @@ export function TasksPage() {
     if (!form.title.trim()) return
 
     try {
-      const body: Record<string, unknown> = { title: form.title.trim() }
+      const body: Record<string, unknown> = { title: form.title.trim(), category: form.category }
       if (form.description.trim()) body.description = form.description.trim()
       if (form.due_date) body.due_date = form.due_date
+      if (form.remind_at) body.remind_at = form.remind_at
       if (form.container_id) body.container_id = parseInt(form.container_id)
       if (form.planting_id) body.planting_id = parseInt(form.planting_id)
 
@@ -226,7 +269,15 @@ export function TasksPage() {
         const newTask = await res.json()
         setTasks((prev) => [newTask, ...prev])
         setShowCreateModal(false)
-        setForm({ title: '', description: '', due_date: '', container_id: '', planting_id: '' })
+        setForm({
+          title: '',
+          description: '',
+          due_date: '',
+          category: 'general',
+          remind_at: '',
+          container_id: '',
+          planting_id: '',
+        })
       }
     } catch (err) {
       console.error('Failed to create task:', err)
@@ -318,6 +369,9 @@ export function TasksPage() {
                         <span className={`task-source-badge task-source-${task.source}`}>
                           {task.source === 'auto' ? '🤖' : '✏️'}
                         </span>
+                        <span className="task-category-badge" title={CATEGORY_LABELS[task.category] || task.category}>
+                          {CATEGORY_ICONS[task.category] || '📋'}
+                        </span>
                         <h4 className="task-title">{task.title}</h4>
                       </div>
                       {task.description && (
@@ -327,6 +381,11 @@ export function TasksPage() {
                         {task.due_date && (
                           <span className="task-due">
                             📅 {formatDate(task.due_date)}
+                          </span>
+                        )}
+                        {task.remind_at && !task.reminder_sent && (
+                          <span className="task-reminder">
+                            ⏰ {formatTime(task.remind_at)}
                           </span>
                         )}
                         {task.container_name && (
@@ -437,6 +496,33 @@ export function TasksPage() {
                   data-1p-ignore
                   data-lpignore="true"
                 />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Category</label>
+                <select
+                  className="form-input"
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                >
+                  {TASK_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {CATEGORY_ICONS[c]} {CATEGORY_LABELS[c]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Remind Me At</label>
+                <input
+                  type="datetime-local"
+                  className="form-input"
+                  value={form.remind_at}
+                  onChange={(e) => setForm({ ...form, remind_at: e.target.value })}
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
+                />
+                <p className="form-help">Optional — sends a push notification at this time.</p>
               </div>
               <div className="form-group">
                 <label className="form-label">Container</label>

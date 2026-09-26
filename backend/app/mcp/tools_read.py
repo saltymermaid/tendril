@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from mcp.server.mcpserver.exceptions import ToolError
 
+from app.config import get_settings
 from app.database import async_session
 from app.mcp.server import mcp_server
 from app.mcp.context import get_mcp_user
@@ -32,6 +33,15 @@ DEFAULT_LIST_LIMIT = 100
 
 def _iso(value):
     return value.isoformat() if value is not None else None
+
+
+def _local_iso(value):
+    """Render a UTC-aware datetime as an ISO string in the app's local timezone."""
+    if value is None:
+        return None
+    from zoneinfo import ZoneInfo
+
+    return value.astimezone(ZoneInfo(get_settings().app_timezone)).isoformat()
 
 
 def _variety_dict(v: Variety) -> dict:
@@ -406,12 +416,14 @@ async def get_planting(planting_id: int) -> dict:
 async def list_tasks(
     status: str | None = None,
     source: str | None = None,
+    category: str | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
     limit: int = DEFAULT_LIST_LIMIT,
 ) -> list[dict]:
     """List tasks, optionally filtered by status (pending/completed/dismissed), source (auto/manual),
-    or due-date range."""
+    category (watering/harvest/planting/seed_starting/pest_disease/maintenance/general), or due-date
+    range. Each task's remind_at (if set) is returned in the app's local timezone."""
     async with async_session() as db:
         user = await get_mcp_user(db)
         stmt = (
@@ -425,6 +437,8 @@ async def list_tasks(
             stmt = stmt.where(Task.status == status)
         if source is not None:
             stmt = stmt.where(Task.source == source)
+        if category is not None:
+            stmt = stmt.where(Task.category == category)
         if start_date is not None:
             stmt = stmt.where(Task.due_date >= start_date)
         if end_date is not None:
@@ -439,6 +453,9 @@ async def list_tasks(
                 "due_date": _iso(t.due_date),
                 "source": t.source,
                 "status": t.status,
+                "category": t.category,
+                "remind_at": _local_iso(t.remind_at),
+                "reminder_sent": t.reminder_sent,
                 "container_id": t.container_id,
                 "planting_id": t.planting_id,
                 "variety_id": t.variety_id,

@@ -1,5 +1,7 @@
 """Tendril API — FastAPI application entry point."""
 
+import asyncio
+import contextlib
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -26,6 +28,7 @@ from app.routers.varieties import router as varieties_router
 from app.routers.weather import router as weather_router
 from app.routers.push import router as push_router
 from app.routers.yards import router as yards_router
+from app.services.reminder_scheduler import reminder_scheduler_loop
 
 
 @asynccontextmanager
@@ -37,7 +40,13 @@ async def lifespan(app: FastAPI):
     instead — the documented pattern for embedding an MCPServer in a larger app.
     """
     async with mcp_server.session_manager.run():
-        yield
+        reminder_task = asyncio.create_task(reminder_scheduler_loop())
+        try:
+            yield
+        finally:
+            reminder_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await reminder_task
 
 
 settings = get_settings()

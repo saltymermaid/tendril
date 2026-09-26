@@ -34,6 +34,7 @@ class Settings(BaseSettings):
 
     # App
     app_name: str = "Tendril"
+    app_timezone: str = "America/New_York"  # St. Petersburg, FL — used to interpret naive reminder times
     debug: bool = False
     cors_origins: str = "http://localhost:5173"  # Comma-separated
     base_url: str = ""  # e.g. https://tendril.garden — used to build OAuth redirect URIs

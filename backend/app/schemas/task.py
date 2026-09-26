@@ -12,6 +12,8 @@ class TaskCreate(BaseModel):
     title: str
     description: Optional[str] = None
     due_date: Optional[date] = None
+    category: str = "general"
+    remind_at: Optional[datetime] = None
     container_id: Optional[int] = None
     planting_id: Optional[int] = None
     variety_id: Optional[int] = None
@@ -21,7 +23,12 @@ class TaskUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     due_date: Optional[date] = None
+    category: Optional[str] = None
+    remind_at: Optional[datetime] = None
     status: Optional[str] = None  # pending, completed, dismissed
+    container_id: Optional[int] = None
+    planting_id: Optional[int] = None
+    variety_id: Optional[int] = None
 
 
 class TaskResponse(BaseModel):
@@ -32,6 +39,9 @@ class TaskResponse(BaseModel):
     due_date: Optional[date] = None
     source: str
     status: str
+    category: str
+    remind_at: Optional[datetime] = None
+    reminder_sent: bool
     container_id: Optional[int] = None
     planting_id: Optional[int] = None
     variety_id: Optional[int] = None

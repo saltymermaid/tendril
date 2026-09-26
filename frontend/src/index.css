@@ -3597,6 +3597,11 @@ select.form-input {
   flex-shrink: 0;
 }
 
+.task-category-badge {
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
 .task-title {
   font-size: 0.95rem;
   font-weight: 600;
@@ -3627,6 +3632,10 @@ select.form-input {
 .task-overdue .task-due {
   color: var(--color-error);
   font-weight: 600;
+}
+
+.task-reminder {
+  color: var(--color-text-secondary);
 }
 
 .task-link {

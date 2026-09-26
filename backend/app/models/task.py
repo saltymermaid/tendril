@@ -2,10 +2,21 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+# Keep in sync with the category badges/filters in TasksPage.tsx.
+TASK_CATEGORIES = {
+    "watering",
+    "harvest",
+    "planting",
+    "seed_starting",
+    "pest_disease",
+    "maintenance",
+    "general",
+}
 
 
 class Task(Base):
@@ -31,6 +42,9 @@ class Task(Base):
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="pending"
     )  # pending, completed, dismissed
+    category: Mapped[str] = mapped_column(String(20), nullable=False, default="general")
+    remind_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reminder_sent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

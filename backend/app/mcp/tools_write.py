@@ -1,5 +1,5 @@
 """Narrow write MCP tools — create/update varieties and categories, create a planting,
-complete a planting, create a task, change a task's status, create a plant start. Still
+complete a planting, create/edit a task, change a task's status, create a plant start. Still
 no deletes and no container/yard/plant-start mutations beyond creation, by design (see
 the plan's confirmed v1 write scope) — variety and category writes were added on top of
 that scope so the catalog can be maintained from an MCP client.
@@ -12,7 +12,7 @@ MCP client (a plain `ValueError` would be masked by the SDK into a generic
 "Error executing tool X" with no detail — see mcp/server/mcpserver/tools/base.py).
 """
 
-from datetime import date
+from datetime import date, datetime
 
 from fastapi import HTTPException
 from mcp.server.mcpserver.exceptions import ToolError
@@ -26,14 +26,23 @@ from app.models.category import Category, PlantingSeason
 from app.models.container import Container
 from app.models.plant_start import PlantStart
 from app.models.planting import Planting
-from app.models.task import Task
+from app.models.task import TASK_CATEGORIES, Task
 from app.models.variety import Variety
-from app.mcp.tools_read import _category_dict, _get_category_detail, _planting_dict, _plant_start_dict, _variety_dict
+from app.mcp.tools_read import (
+    _category_dict,
+    _get_category_detail,
+    _local_iso,
+    _planting_dict,
+    _plant_start_dict,
+    _variety_dict,
+)
 from app.routers.plantings import _check_overlap, _consume_plant_start, validate_planting_bounds
+from app.services.localtime import to_utc
 
 VALID_REMOVAL_REASONS = {"harvest_complete", "died", "pulled_early", "pest_disease", "other"}
 VALID_PLANTING_METHODS = {"direct_sow", "transplant", "both"}
 VALID_HARVEST_TYPES = {"single", "continuous"}
+VALID_TASK_STATUSES = {"pending", "completed", "dismissed"}
 
 
 def _planting_season_from_dict(category_id: int, ps: dict) -> PlantingSeason:
@@ -337,16 +346,46 @@ async def create_plant_start(variety_id: int, start_date: date, quantity: int = 
         return _plant_start_dict(result.scalar_one())
 
 
+def _task_dict(t: Task) -> dict:
+    return {
+        "id": t.id,
+        "title": t.title,
+        "description": t.description,
+        "due_date": t.due_date.isoformat() if t.due_date else None,
+        "source": t.source,
+        "status": t.status,
+        "category": t.category,
+        "remind_at": _local_iso(t.remind_at),
+        "reminder_sent": t.reminder_sent,
+        "container_id": t.container_id,
+        "planting_id": t.planting_id,
+        "variety_id": t.variety_id,
+    }
+
+
 @mcp_server.tool()
 async def create_task(
     title: str,
     description: str | None = None,
     due_date: date | None = None,
+    category: str = "general",
+    remind_at: datetime | None = None,
     container_id: int | None = None,
     planting_id: int | None = None,
     variety_id: int | None = None,
 ) -> dict:
-    """Create a manual task (source is always 'manual' — auto tasks come from the task generator)."""
+    """Create a manual task (source is always 'manual' — auto tasks come from the task generator).
+
+    category must be one of: watering, harvest, planting, seed_starting, pest_disease,
+    maintenance, general.
+
+    remind_at, if given, schedules a push notification: pass it as local time
+    (America/New_York, where the garden is) with no timezone offset, e.g.
+    "2026-09-27T18:00:00" for 6pm tomorrow — it's interpreted as local time automatically.
+    """
+    if category not in TASK_CATEGORIES:
+        raise ToolError(f"category must be one of: {', '.join(sorted(TASK_CATEGORIES))}")
+
     async with async_session() as db:
         user = await get_mcp_user(db)
         task = Task(
@@ -355,30 +394,23 @@ async def create_task(
             description=description,
             due_date=due_date,
             source="manual",
+            category=category,
+            remind_at=to_utc(remind_at),
             container_id=container_id,
             planting_id=planting_id,
             variety_id=variety_id,
         )
         db.add(task)
         await db.commit()
-        return {
-            "id": task.id,
-            "title": task.title,
-            "description": task.description,
-            "due_date": due_date.isoformat() if due_date else None,
-            "source": task.source,
-            "status": task.status,
-            "container_id": task.container_id,
-            "planting_id": task.planting_id,
-            "variety_id": task.variety_id,
-        }
+        return _task_dict(task)
 
 
 @mcp_server.tool()
 async def update_task_status(task_id: int, status: str) -> dict:
-    """Mark a task completed or dismissed. status must be one of: completed, dismissed."""
-    if status not in ("completed", "dismissed"):
-        raise ToolError("status must be 'completed' or 'dismissed'")
+    """Change a task's status. status must be one of: pending, completed, dismissed
+    (pending re-opens a completed/dismissed task)."""
+    if status not in VALID_TASK_STATUSES:
+        raise ToolError(f"status must be one of: {', '.join(sorted(VALID_TASK_STATUSES))}")
 
     async with async_session() as db:
         user = await get_mcp_user(db)
@@ -390,6 +422,44 @@ async def update_task_status(task_id: int, status: str) -> dict:
         task.status = status
         await db.commit()
         return {"id": task.id, "title": task.title, "status": task.status}
+
+
+@mcp_server.tool()
+async def update_task(
+    task_id: int,
+    title: str | None = None,
+    description: str | None = None,
+    due_date: date | None = None,
+    category: str | None = None,
+    remind_at: datetime | None = None,
+) -> dict:
+    """Edit an existing task's title, description, due date, category, or reminder time.
+    Only the fields you pass are changed. Rescheduling remind_at lets it fire again even
+    if the previous reminder already went out. To change status, use update_task_status."""
+    if category is not None and category not in TASK_CATEGORIES:
+        raise ToolError(f"category must be one of: {', '.join(sorted(TASK_CATEGORIES))}")
+
+    async with async_session() as db:
+        user = await get_mcp_user(db)
+        result = await db.execute(select(Task).where(Task.id == task_id, Task.user_id == user.id))
+        task = result.scalar_one_or_none()
+        if not task:
+            raise ToolError(f"Task {task_id} not found")
+
+        if title is not None:
+            task.title = title
+        if description is not None:
+            task.description = description
+        if due_date is not None:
+            task.due_date = due_date
+        if category is not None:
+            task.category = category
+        if remind_at is not None:
+            task.remind_at = to_utc(remind_at)
+            task.reminder_sent = False
+
+        await db.commit()
+        return _task_dict(task)
 
 
 @mcp_server.tool()
