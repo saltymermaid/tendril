@@ -449,46 +449,48 @@ export function SettingsPage() {
       </form>
 
       {/* Push Notification Devices */}
-      <div className="form-group">
-        <label className="form-label">Notification Devices</label>
-        {subscriptionsLoading ? (
-          <p className="form-help">Loading…</p>
-        ) : subscriptions.length === 0 ? (
-          <p className="form-help">
-            No devices are subscribed to push notifications yet. Enable notifications from
-            the Dashboard to get reminders sent to this device.
-          </p>
-        ) : (
-          <>
-            <div className="push-sub-list">
-              {subscriptions.map((sub) => (
-                <div key={sub.id} className="push-sub-item">
-                  <div className="push-sub-info">
-                    <span className="push-sub-platform">
-                      {sub.platform}
-                      {sub.endpoint === currentEndpoint && (
-                        <span className="push-sub-badge">This device</span>
-                      )}
-                    </span>
-                    <span className="push-sub-date">Added {formatSubDate(sub.created_at)}</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline"
-                    onClick={() => handleRemoveSubscription(sub.id)}
-                    disabled={removingSubId === sub.id}
-                  >
-                    {removingSubId === sub.id ? 'Removing…' : 'Remove'}
-                  </button>
-                </div>
-              ))}
-            </div>
+      <div className="settings-form" style={{ marginTop: 'var(--space-4)' }}>
+        <div className="form-group">
+          <label className="form-label">Notification Devices</label>
+          {subscriptionsLoading ? (
+            <p className="form-help">Loading…</p>
+          ) : subscriptions.length === 0 ? (
             <p className="form-help">
-              Each device sends its own copy of a reminder — remove any you no longer use to
-              stop duplicate notifications.
+              No devices are subscribed to push notifications yet. Enable notifications from
+              the Dashboard to get reminders sent to this device.
             </p>
-          </>
-        )}
+          ) : (
+            <>
+              <div className="push-sub-list">
+                {subscriptions.map((sub) => (
+                  <div key={sub.id} className="push-sub-item">
+                    <div className="push-sub-info">
+                      <span className="push-sub-platform">
+                        {sub.platform}
+                        {sub.endpoint === currentEndpoint && (
+                          <span className="push-sub-badge">This device</span>
+                        )}
+                      </span>
+                      <span className="push-sub-date">Added {formatSubDate(sub.created_at)}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-danger"
+                      onClick={() => handleRemoveSubscription(sub.id)}
+                      disabled={removingSubId === sub.id}
+                    >
+                      {removingSubId === sub.id ? 'Removing…' : 'Remove'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <p className="form-help">
+                Each device sends its own copy of a reminder — remove any you no longer use to
+                stop duplicate notifications.
+              </p>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

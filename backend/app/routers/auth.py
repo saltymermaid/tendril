@@ -40,13 +40,16 @@ def _set_auth_cookies(response: Response, user_id: int, session_timeout_hours: i
     *session_timeout_hours* overrides the site-wide default when the user has
     configured a custom session timeout in their settings.
     """
-    access_token = create_access_token(user_id)
+    access_token = create_access_token(user_id, hours=session_timeout_hours)
     refresh_token = create_refresh_token(user_id, hours=session_timeout_hours)
 
-    # Compute refresh cookie max_age from hours or fall back to site default
+    # Compute cookie max_ages from hours or fall back to site defaults. Both cookies
+    # must agree with their token's own hours= above, or the cookie would outlive
+    # (or expire before) the JWT it holds.
     if session_timeout_hours is not None:
-        refresh_max_age = session_timeout_hours * 3600
+        access_max_age = refresh_max_age = session_timeout_hours * 3600
     else:
+        access_max_age = settings.access_token_expire_minutes * 60
         refresh_max_age = settings.refresh_token_expire_days * 86400
 
     # secure=True in production (HTTPS via Cloudflare Tunnel); False only in local dev
@@ -58,7 +61,7 @@ def _set_auth_cookies(response: Response, user_id: int, session_timeout_hours: i
         httponly=True,
         secure=secure,
         samesite="lax",
-        max_age=settings.access_token_expire_minutes * 60,
+        max_age=access_max_age,
         path="/",
     )
     response.set_cookie(

@@ -14,9 +14,20 @@ settings = get_settings()
 ALGORITHM = "HS256"
 
 
-def create_access_token(user_id: int) -> str:
-    """Create a short-lived access token."""
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
+def create_access_token(user_id: int, hours: int | None = None) -> str:
+    """Create an access token.
+
+    Every request is authenticated off this token alone (see get_current_user) — the
+    refresh token is only consulted once this one expires. So *hours*, when given (the
+    user's configured session timeout), must cap this token's lifetime too, or a
+    shorter session-timeout setting would have no real effect: requests would keep
+    succeeding on the still-valid access token for up to the site-wide default
+    regardless of what the user chose.
+    """
+    if hours is not None:
+        expire = datetime.now(timezone.utc) + timedelta(hours=hours)
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
     payload = {
         "sub": str(user_id),
         "type": "access",
@@ -68,13 +79,23 @@ async def get_or_create_user(
     user = result.scalar_one_or_none()
 
     if user:
-        # Update fields if provided
         if google_id and not user.google_id:
             user.google_id = google_id
-        if name and not user.name:
-            user.name = name
-        if avatar_url and not user.avatar_url:
-            user.avatar_url = avatar_url
+        # A real Google login (google_id present) carries an authoritative profile —
+        # keep name/avatar fresh from it even if already set, so a placeholder name
+        # from an earlier dev-login (email's local part) gets corrected. Dev-login
+        # itself (no google_id) only fills in blanks, so it never overwrites a real
+        # Google profile with its placeholder.
+        if google_id:
+            if name:
+                user.name = name
+            if avatar_url:
+                user.avatar_url = avatar_url
+        else:
+            if name and not user.name:
+                user.name = name
+            if avatar_url and not user.avatar_url:
+                user.avatar_url = avatar_url
         await db.flush()
         return user
 

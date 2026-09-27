@@ -106,6 +106,8 @@ export function DashboardPage() {
     return 'Good evening'
   }
 
+  const firstName = user?.name?.trim().split(/\s+/)[0] || 'Gardener'
+
   if (loading) {
     return (
       <div className="page-container">
@@ -118,7 +120,7 @@ export function DashboardPage() {
     <div className="page-container">
       {/* Header */}
       <div className="dashboard-greeting">
-        <h2>{greeting()}, {user?.name || 'Gardener'}! 🌱</h2>
+        <h2>{greeting()}, {firstName}! 🌱</h2>
         <p className="text-secondary">
           {new Date().toLocaleDateString('en-US', {
             weekday: 'long',
