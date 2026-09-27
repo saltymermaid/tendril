@@ -38,6 +38,7 @@ interface PlantingData {
   tower_level: number | null
   start_date: string
   end_date: string
+  seed_start_date: string | null
   status: string
   planting_method: string | null
   quantity: number | null
@@ -158,17 +159,21 @@ export function ContainerDetailPage() {
     square_height: 1,
   })
 
-  // Auto-compute end_date when variety or start_date changes
+  // Auto-compute end_date from days_to_harvest, which is measured from seed —
+  // anchor on the plant start's seed date when transplanting one, not on
+  // start_date (which is just when it goes into this square).
   useEffect(() => {
     if (!selectedVariety || !varieties.length) return
     const variety = varieties.find(v => v.id === selectedVariety)
     if (!variety?.days_to_harvest_max) return
-    // Parse start_date in local time to avoid UTC offset issues
-    const [yr, mo, dy] = plantingForm.start_date.split('-').map(Number)
+    const selectedStart = selectedStartId ? plantStarts.find(s => s.id === selectedStartId) : null
+    const anchorDateStr = selectedStart ? selectedStart.start_date : plantingForm.start_date
+    // Parse the anchor date in local time to avoid UTC offset issues
+    const [yr, mo, dy] = anchorDateStr.split('-').map(Number)
     const end = new Date(yr, mo - 1, dy + variety.days_to_harvest_max)
     const endDate = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`
     setPlantingForm(prev => ({ ...prev, end_date: endDate }))
-  }, [selectedVariety, plantingForm.start_date])
+  }, [selectedVariety, plantingForm.start_date, selectedStartId, plantStarts])
 
   const [plantingError, setPlantingError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -182,11 +187,14 @@ export function ContainerDetailPage() {
   const [editForm, setEditForm] = useState({
     start_date: '',
     end_date: '',
+    seed_start_date: '' as string,
     planting_method: '' as string,
     quantity: '' as string,
   })
   const [editError, setEditError] = useState('')
   const [editSubmitting, setEditSubmitting] = useState(false)
+  const [deletingPlanting, setDeletingPlanting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   // Recommendation state
   const [recommendations, setRecommendations] = useState<RecommendationData | null>(null)
@@ -332,6 +340,31 @@ export function ContainerDetailPage() {
     })
   }
 
+  async function handleDeletePlanting() {
+    if (!selectedPlanting) return
+    const warning = selectedPlanting.status === 'not_started'
+      ? 'Remove this planned planting?'
+      : `Permanently delete this ${statusLabel(selectedPlanting.status).toLowerCase()} planting and all record of it? This can't be undone.`
+    if (!window.confirm(warning)) return
+
+    setDeletingPlanting(true)
+    setDeleteError('')
+    try {
+      const res = await apiFetch(`/api/plantings/${selectedPlanting.id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || 'Failed to delete planting')
+      }
+      setSelectedPlanting(null)
+      fetchPlantings(selectedDate)
+      fetchPlantStarts()
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete planting')
+    } finally {
+      setDeletingPlanting(false)
+    }
+  }
+
   async function handleActivatePlanting(plantingId: number) {
     setActivating(true)
     try {
@@ -350,6 +383,7 @@ export function ContainerDetailPage() {
     setEditForm({
       start_date: selectedPlanting.start_date,
       end_date: selectedPlanting.end_date,
+      seed_start_date: selectedPlanting.seed_start_date || '',
       planting_method: selectedPlanting.planting_method || '',
       quantity: selectedPlanting.quantity ? String(selectedPlanting.quantity) : '',
     })
@@ -373,6 +407,7 @@ export function ContainerDetailPage() {
       const body: Record<string, unknown> = {
         start_date: editForm.start_date,
         end_date: editForm.end_date,
+        seed_start_date: editForm.seed_start_date || null,
         planting_method: editForm.planting_method || null,
         quantity: editForm.quantity ? Number(editForm.quantity) : null,
       }
@@ -470,7 +505,6 @@ export function ContainerDetailPage() {
     setPlantingForm(prev => ({
       ...prev,
       planting_method: 'transplant',
-      start_date: s.start_date,
       quantity: String(Math.min(1, s.quantity)),
     }))
   }
@@ -550,7 +584,6 @@ export function ContainerDetailPage() {
     setSelectedStartId(s.id)
     setPlantingForm(prev => ({
       ...prev,
-      start_date: s.start_date,
       quantity: String(Math.min(Number(prev.quantity) || 1, s.quantity)),
     }))
   }
@@ -1145,7 +1178,8 @@ export function ContainerDetailPage() {
                   </div>
                   {selectedStartId && (
                     <p className="text-muted">
-                      Start Date set from this start's seed date — end date recalculated accordingly.
+                      End date is calculated from this start's seed date, not from Start Date
+                      above — Start Date is just when it goes into this square.
                     </p>
                   )}
                 </div>
@@ -1209,6 +1243,22 @@ export function ContainerDetailPage() {
                       value={editForm.end_date}
                       onChange={(e) => setEditForm({ ...editForm, end_date: e.target.value })}
                       required
+                      autoComplete="off"
+                      data-1p-ignore
+                      data-lpignore="true"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Seed Started</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={editForm.seed_start_date}
+                      onChange={(e) => setEditForm({ ...editForm, seed_start_date: e.target.value })}
+                      placeholder="If transplanted"
                       autoComplete="off"
                       data-1p-ignore
                       data-lpignore="true"
@@ -1285,6 +1335,12 @@ export function ContainerDetailPage() {
                       <span className="detail-label">Dates</span>
                       <span className="detail-value">{selectedPlanting.start_date} → {selectedPlanting.end_date}</span>
                     </div>
+                    {selectedPlanting.seed_start_date && (
+                      <div className="detail-item">
+                        <span className="detail-label">Seed Started</span>
+                        <span className="detail-value">{selectedPlanting.seed_start_date}</span>
+                      </div>
+                    )}
                     {selectedPlanting.planting_method && (
                       <div className="detail-item">
                         <span className="detail-label">Method</span>
@@ -1299,6 +1355,8 @@ export function ContainerDetailPage() {
                     )}
                   </div>
                 </div>
+
+                {deleteError && <div className="form-message error">{deleteError}</div>}
 
                 <div className="modal-actions">
                   <button className="btn btn-outline-dark" onClick={startEditPlanting}>
@@ -1342,6 +1400,13 @@ export function ContainerDetailPage() {
                     }}
                   >
                     ➕ Plan Next
+                  </button>
+                  <button
+                    className="btn btn-danger"
+                    onClick={handleDeletePlanting}
+                    disabled={deletingPlanting}
+                  >
+                    {deletingPlanting ? 'Deleting...' : '🗑️ Delete'}
                   </button>
                 </div>
               </>

@@ -29,8 +29,11 @@ class Planting(Base):
     tower_level: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Only for tower plantings
 
     # Dates
-    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)  # When this went into the ground/square
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    seed_start_date: Mapped[date | None] = mapped_column(
+        Date, nullable=True
+    )  # When the seed was started, if transplanted — anchors days_to_harvest, since that's measured from seed
 
     # Status
     status: Mapped[str] = mapped_column(

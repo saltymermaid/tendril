@@ -1,8 +1,16 @@
-"""Narrow write MCP tools — create/update varieties and categories, create a planting,
-complete a planting, create/edit a task, change a task's status, create a plant start. Still
-no deletes and no container/yard/plant-start mutations beyond creation, by design (see
-the plan's confirmed v1 write scope) — variety and category writes were added on top of
-that scope so the catalog can be maintained from an MCP client.
+"""Narrow write MCP tools — create/update varieties and categories, create/edit/delete a
+planting, complete a planting, create/edit a task, change a task's status, create a plant
+start. update_planting and delete_planting are both restricted to not_started plantings —
+editing or removing something already in the ground stays REST/UI-only (see complete_planting
+for recording an actual removal). No container/yard/plant-start mutations beyond creation,
+by design (see the plan's confirmed v1 write scope) — variety and category writes were added
+on top of that scope so the catalog can be maintained from an MCP client.
+
+end_date must be computed from seed_start_date (or the referenced plant start's start_date)
+when transplanting, not from start_date — days_to_harvest on Variety is measured from seed,
+and start_date here means "went into this square," which for a transplant is well after the
+seed was actually started. Get the variety's days_to_harvest and, if transplanting, the plant
+start's start_date (via get_variety / list_plant_starts) before calling create_planting.
 
 Validation is reused, not duplicated: `_check_overlap` and `validate_planting_bounds`
 are imported directly from the REST plantings router so the two entry points can't
@@ -199,12 +207,16 @@ async def create_planting(
     planting_method: str | None = None,
     quantity: int | None = None,
     start_id: int | None = None,
+    seed_start_date: date | None = None,
 ) -> dict:
     """Create a new planting — assign a variety to a square (or squares) of a container
     for a date range. Rejects overlaps with existing plantings on the same squares/dates
     and positions outside the container's bounds. If start_id is given, decrements that
     many (quantity, default 1) from the referenced plant start — it must be for the same
-    variety and have enough remaining."""
+    variety and have enough remaining, and seed_start_date defaults to that start's
+    start_date if not given. seed_start_date (defaulted or explicit) is what
+    days_to_harvest is measured from — see the module docstring; start_date is just when
+    it went into this square."""
     async with async_session() as db:
         user = await get_mcp_user(db)
 
@@ -222,6 +234,9 @@ async def create_planting(
 
         if end_date <= start_date:
             raise ToolError("end_date must be after start_date")
+
+        if seed_start_date and seed_start_date > start_date:
+            raise ToolError("seed_start_date must be on or before start_date")
 
         try:
             validate_planting_bounds(
@@ -244,13 +259,15 @@ async def create_planting(
                 end_date=end_date,
             )
             if start_id is not None:
-                await _consume_plant_start(
+                consumed_start = await _consume_plant_start(
                     db=db,
                     user_id=user.id,
                     start_id=start_id,
                     variety_id=variety_id,
                     quantity=quantity or 1,
                 )
+                if seed_start_date is None:
+                    seed_start_date = consumed_start.start_date
         except HTTPException as exc:
             raise ToolError(exc.detail) from exc
 
@@ -265,6 +282,7 @@ async def create_planting(
             tower_level=tower_level,
             start_date=start_date,
             end_date=end_date,
+            seed_start_date=seed_start_date,
             planting_method=planting_method,
             quantity=quantity,
             start_id=start_id,
@@ -323,6 +341,136 @@ async def complete_planting(
         )
         loaded = result.scalar_one()
         return _planting_dict(loaded)
+
+
+@mcp_server.tool()
+async def update_planting(
+    planting_id: int,
+    square_x: int | None = None,
+    square_y: int | None = None,
+    variety_id: int | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    seed_start_date: date | None = None,
+    planting_method: str | None = None,
+    quantity: int | None = None,
+) -> dict:
+    """Edit a planned (not_started) planting — move it to a different square, swap its
+    variety, or adjust its dates/method/quantity. Only works while status is not_started
+    (this is for previewing/adjusting a plan before anything is in the ground); once a
+    planting is in_progress or complete, edit it in the app instead. Re-checks bounds and
+    overlap if position or dates change."""
+    async with async_session() as db:
+        user = await get_mcp_user(db)
+
+        result = await db.execute(
+            select(Planting)
+            .options(selectinload(Planting.container))
+            .where(Planting.id == planting_id, Planting.user_id == user.id)
+        )
+        planting = result.scalar_one_or_none()
+        if not planting:
+            raise ToolError(f"Planting {planting_id} not found")
+        if planting.status != "not_started":
+            raise ToolError(
+                f"Cannot edit planting with status '{planting.status}' via chat. "
+                "Only 'not_started' plantings can be edited this way."
+            )
+
+        if variety_id is not None:
+            result = await db.execute(select(Variety).where(Variety.id == variety_id, Variety.user_id == user.id))
+            if not result.scalar_one_or_none():
+                raise ToolError(f"Variety {variety_id} not found")
+
+        new_x = square_x if square_x is not None else planting.square_x
+        new_y = square_y if square_y is not None else planting.square_y
+        new_start = start_date or planting.start_date
+        new_end = end_date or planting.end_date
+        new_seed_start = seed_start_date if seed_start_date is not None else planting.seed_start_date
+
+        if new_end <= new_start:
+            raise ToolError("end_date must be after start_date")
+        if new_seed_start and new_seed_start > new_start:
+            raise ToolError("seed_start_date must be on or before start_date")
+
+        try:
+            validate_planting_bounds(
+                container=planting.container,
+                square_x=new_x,
+                square_y=new_y,
+                square_width=planting.square_width,
+                square_height=planting.square_height,
+                tower_level=planting.tower_level,
+            )
+            await _check_overlap(
+                db=db,
+                user_id=user.id,
+                container_id=planting.container_id,
+                square_x=new_x,
+                square_y=new_y,
+                square_width=planting.square_width,
+                square_height=planting.square_height,
+                start_date=new_start,
+                end_date=new_end,
+                exclude_planting_id=planting.id,
+            )
+        except HTTPException as exc:
+            raise ToolError(exc.detail) from exc
+
+        planting.square_x = new_x
+        planting.square_y = new_y
+        if variety_id is not None:
+            planting.variety_id = variety_id
+        planting.start_date = new_start
+        planting.end_date = new_end
+        planting.seed_start_date = new_seed_start
+        if planting_method is not None:
+            planting.planting_method = planting_method
+        if quantity is not None:
+            planting.quantity = quantity
+
+        await db.commit()
+
+        result = await db.execute(
+            select(Planting)
+            .options(selectinload(Planting.variety), selectinload(Planting.container))
+            .where(Planting.id == planting.id)
+        )
+        loaded = result.scalar_one()
+        return _planting_dict(loaded)
+
+
+@mcp_server.tool()
+async def delete_planting(planting_id: int) -> dict:
+    """Delete a planned (not_started) planting outright — for backing out a plan you don't
+    want, e.g. "don't put the broccoli there." Only works while status is not_started; a
+    planting already in the ground or complete can't be deleted this way (removes its
+    history) — use complete_planting to record it ending, or edit it in the app. If it was
+    transplanted from a plant start, that start's quantity is restored."""
+    async with async_session() as db:
+        user = await get_mcp_user(db)
+
+        result = await db.execute(select(Planting).where(Planting.id == planting_id, Planting.user_id == user.id))
+        planting = result.scalar_one_or_none()
+        if not planting:
+            raise ToolError(f"Planting {planting_id} not found")
+        if planting.status != "not_started":
+            raise ToolError(
+                f"Cannot delete planting with status '{planting.status}'. "
+                "Only 'not_started' plantings can be deleted this way."
+            )
+
+        if planting.start_id is not None:
+            result = await db.execute(
+                select(PlantStart).where(PlantStart.id == planting.start_id, PlantStart.user_id == user.id)
+            )
+            start = result.scalar_one_or_none()
+            if start:
+                start.quantity += planting.quantity or 1
+
+        await db.delete(planting)
+        await db.commit()
+        return {"deleted": True, "planting_id": planting_id}
 
 
 @mcp_server.tool()

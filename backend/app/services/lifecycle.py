@@ -3,10 +3,15 @@
 Computes the current growth phase of an in-progress planting based on
 the planting start date and the variety's growth timing data.
 
+Germination and harvest timing are anchored to seed_start_date when given
+(days_to_germination/days_to_harvest are measured from seed, not from the
+transplant-into-bed date) — otherwise they fall back to start_date, which
+is correct for a direct sow where the seed goes straight into the square.
+
 Phases:
-  1. Germination: start_date → start_date + days_to_germination
-  2. Growing: end of germination → start_date + days_to_harvest
-  3. Harvesting: start_date + days_to_harvest → end_date
+  1. Germination: seed_anchor → seed_anchor + days_to_germination
+  2. Growing: end of germination → seed_anchor + days_to_harvest
+  3. Harvesting: seed_anchor + days_to_harvest → end_date
 """
 
 from dataclasses import dataclass
@@ -37,18 +42,23 @@ def compute_lifecycle_phase(
     days_to_harvest_min: int | None = None,
     days_to_harvest_max: int | None = None,
     as_of: date | None = None,
+    seed_start_date: date | None = None,
 ) -> LifecyclePhase:
     """Compute the current lifecycle phase for a planting.
 
     Args:
         status: Planting status (not_started, in_progress, complete)
-        start_date: When the planting was started
+        start_date: When the planting was started (into the ground/square)
         end_date: When the planting ends/ended
         days_to_germination_min: Min days to germination from variety
         days_to_germination_max: Max days to germination from variety
         days_to_harvest_min: Min days to harvest from variety
         days_to_harvest_max: Max days to harvest from variety
         as_of: Date to compute phase for (defaults to today)
+        seed_start_date: When the seed was actually started, if this was
+            transplanted from a plant start — germination/harvest timing is
+            anchored here instead of start_date when given, since it's
+            measured from seed. Falls back to start_date for direct sow.
 
     Returns:
         LifecyclePhase with computed phase information
@@ -92,9 +102,11 @@ def compute_lifecycle_phase(
     germ_days = _avg_days(days_to_germination_min, days_to_germination_max, default=7)
     harvest_days = _avg_days(days_to_harvest_min, days_to_harvest_max, default=60)
 
-    # Phase boundaries
-    germ_end_date = start_date + timedelta(days=germ_days)
-    harvest_start_date = start_date + timedelta(days=harvest_days)
+    # Phase boundaries — anchored to the seed date when known, so a transplant
+    # that already germinated in the tray doesn't show "germination" again
+    seed_anchor = seed_start_date or start_date
+    germ_end_date = seed_anchor + timedelta(days=germ_days)
+    harvest_start_date = seed_anchor + timedelta(days=harvest_days)
 
     if as_of < germ_end_date:
         # Germination phase

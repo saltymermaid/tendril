@@ -333,6 +333,7 @@ def _planting_dict(p: Planting) -> dict:
             days_to_germination_max=p.variety.days_to_germination_max,
             days_to_harvest_min=p.variety.days_to_harvest_min,
             days_to_harvest_max=p.variety.days_to_harvest_max,
+            seed_start_date=p.seed_start_date,
         )
         lifecycle = {
             "phase": phase.phase,
@@ -353,6 +354,7 @@ def _planting_dict(p: Planting) -> dict:
         "tower_level": p.tower_level,
         "start_date": _iso(p.start_date),
         "end_date": _iso(p.end_date),
+        "seed_start_date": _iso(p.seed_start_date),
         "status": p.status,
         "planting_method": p.planting_method,
         "quantity": p.quantity,

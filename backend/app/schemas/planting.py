@@ -15,6 +15,7 @@ class PlantingBase(BaseModel):
     tower_level: int | None = None
     start_date: date
     end_date: date
+    seed_start_date: date | None = None  # When the seed was started, if transplanted
     planting_method: str | None = None  # direct_sow, transplant
     quantity: int | None = None
     start_id: int | None = None  # Plant Start this was transplanted from, if any
@@ -27,6 +28,7 @@ class PlantingCreate(PlantingBase):
 class PlantingUpdate(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
+    seed_start_date: date | None = None
     planting_method: str | None = None
     quantity: int | None = None
     status: str | None = None  # not_started, in_progress, complete
@@ -68,6 +70,7 @@ class PlantingResponse(BaseModel):
     tower_level: int | None = None
     start_date: date
     end_date: date
+    seed_start_date: date | None = None
     status: str
     planting_method: str | None = None
     quantity: int | None = None

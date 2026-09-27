@@ -39,6 +39,7 @@ def _compute_lifecycle(p: Planting) -> LifecyclePhaseResponse | None:
         days_to_germination_max=variety.days_to_germination_max if variety else None,
         days_to_harvest_min=variety.days_to_harvest_min if variety else None,
         days_to_harvest_max=variety.days_to_harvest_max if variety else None,
+        seed_start_date=p.seed_start_date,
     )
     return LifecyclePhaseResponse(
         phase=phase.phase,
@@ -81,6 +82,7 @@ def _planting_to_response(p: Planting) -> PlantingResponse:
         tower_level=p.tower_level,
         start_date=p.start_date,
         end_date=p.end_date,
+        seed_start_date=p.seed_start_date,
         status=p.status,
         planting_method=p.planting_method,
         quantity=p.quantity,
@@ -259,6 +261,9 @@ async def create_planting(
     if body.end_date <= body.start_date:
         raise HTTPException(status_code=400, detail="end_date must be after start_date")
 
+    if body.seed_start_date and body.seed_start_date > body.start_date:
+        raise HTTPException(status_code=400, detail="seed_start_date must be on or before start_date")
+
     validate_planting_bounds(
         container=container,
         square_x=body.square_x,
@@ -280,14 +285,17 @@ async def create_planting(
         end_date=body.end_date,
     )
 
+    seed_start_date = body.seed_start_date
     if body.start_id is not None:
-        await _consume_plant_start(
+        consumed_start = await _consume_plant_start(
             db=db,
             user_id=current_user.id,
             start_id=body.start_id,
             variety_id=body.variety_id,
             quantity=body.quantity or 1,
         )
+        if seed_start_date is None:
+            seed_start_date = consumed_start.start_date
 
     planting = Planting(
         user_id=current_user.id,
@@ -300,6 +308,7 @@ async def create_planting(
         tower_level=body.tower_level,
         start_date=body.start_date,
         end_date=body.end_date,
+        seed_start_date=seed_start_date,
         planting_method=body.planting_method,
         quantity=body.quantity,
         start_id=body.start_id,
@@ -490,8 +499,11 @@ async def update_planting(
 
     new_start = update_data.get("start_date", planting.start_date)
     new_end = update_data.get("end_date", planting.end_date)
+    new_seed_start = update_data.get("seed_start_date", planting.seed_start_date)
     if new_end <= new_start:
         raise HTTPException(status_code=400, detail="end_date must be after start_date")
+    if new_seed_start and new_seed_start > new_start:
+        raise HTTPException(status_code=400, detail="seed_start_date must be on or before start_date")
 
     if "start_date" in update_data or "end_date" in update_data:
         await _check_overlap(
@@ -659,7 +671,11 @@ async def delete_planting(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Delete a planting. Only allowed for not_started plantings."""
+    """Delete a planting outright, regardless of status — for correcting a mistake
+    (e.g. a duplicate entry, or one logged in the wrong square/date), not for recording
+    a real removal (use the complete action for that). If it was transplanted from a
+    plant start, that start's quantity is restored. Related events, tasks, and journal
+    notes are kept but detached (their planting_id is cleared)."""
     result = await db.execute(
         select(Planting).where(
             Planting.id == planting_id,
@@ -670,12 +686,15 @@ async def delete_planting(
     if not planting:
         raise HTTPException(status_code=404, detail="Planting not found")
 
-    if planting.status != "not_started":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot delete planting with status '{planting.status}'. "
-            "Only 'not_started' plantings can be deleted.",
+    if planting.start_id is not None:
+        result = await db.execute(
+            select(PlantStart).where(
+                PlantStart.id == planting.start_id, PlantStart.user_id == current_user.id
+            )
         )
+        start = result.scalar_one_or_none()
+        if start:
+            start.quantity += planting.quantity or 1
 
     await db.delete(planting)
     await db.commit()
