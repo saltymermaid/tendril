@@ -957,6 +957,53 @@ textarea.form-input {
   font-size: var(--font-size-sm);
 }
 
+.push-sub-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.push-sub-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background-color: var(--color-gray-50);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+.push-sub-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.push-sub-platform {
+  font-weight: 600;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.push-sub-badge {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-primary);
+  background-color: var(--color-green-50);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+}
+
+.push-sub-date {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
 /* Segmented control (e.g. session timeout picker) */
 .segmented-control {
   display: flex;

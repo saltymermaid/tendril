@@ -20,6 +20,18 @@ interface LocationResult {
   lon: number
 }
 
+interface PushSubscriptionData {
+  id: number
+  endpoint: string
+  platform: string
+  created_at: string
+}
+
+function formatSubDate(isoStr: string): string {
+  const d = new Date(isoStr)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 const SESSION_TIMEOUT_OPTIONS = [
   { value: 4, label: '4 hours' },
   { value: 8, label: '8 hours' },
@@ -59,9 +71,51 @@ export function SettingsPage() {
   const searchWrapperRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Push notification subscriptions
+  const [subscriptions, setSubscriptions] = useState<PushSubscriptionData[]>([])
+  const [subscriptionsLoading, setSubscriptionsLoading] = useState(true)
+  const [currentEndpoint, setCurrentEndpoint] = useState<string | null>(null)
+  const [removingSubId, setRemovingSubId] = useState<number | null>(null)
+
   useEffect(() => {
     fetchSettings()
+    fetchSubscriptions()
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then((reg) => {
+        reg.pushManager.getSubscription().then((sub) => {
+          if (sub) setCurrentEndpoint(sub.endpoint)
+        })
+      })
+    }
   }, [])
+
+  const fetchSubscriptions = async () => {
+    try {
+      const res = await apiFetch('/api/push/subscriptions')
+      if (res.ok) {
+        setSubscriptions(await res.json())
+      }
+    } catch {
+      // Non-critical — settings page still works without this list
+    } finally {
+      setSubscriptionsLoading(false)
+    }
+  }
+
+  const handleRemoveSubscription = async (id: number) => {
+    setRemovingSubId(id)
+    try {
+      const res = await apiFetch(`/api/push/subscriptions/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setSubscriptions((prev) => prev.filter((s) => s.id !== id))
+      }
+    } catch {
+      // Leave the list as-is; user can retry
+    } finally {
+      setRemovingSubId(null)
+    }
+  }
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -393,6 +447,49 @@ export function SettingsPage() {
           {saving ? 'Saving...' : 'Save Settings'}
         </button>
       </form>
+
+      {/* Push Notification Devices */}
+      <div className="form-group">
+        <label className="form-label">Notification Devices</label>
+        {subscriptionsLoading ? (
+          <p className="form-help">Loading…</p>
+        ) : subscriptions.length === 0 ? (
+          <p className="form-help">
+            No devices are subscribed to push notifications yet. Enable notifications from
+            the Dashboard to get reminders sent to this device.
+          </p>
+        ) : (
+          <>
+            <div className="push-sub-list">
+              {subscriptions.map((sub) => (
+                <div key={sub.id} className="push-sub-item">
+                  <div className="push-sub-info">
+                    <span className="push-sub-platform">
+                      {sub.platform}
+                      {sub.endpoint === currentEndpoint && (
+                        <span className="push-sub-badge">This device</span>
+                      )}
+                    </span>
+                    <span className="push-sub-date">Added {formatSubDate(sub.created_at)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline"
+                    onClick={() => handleRemoveSubscription(sub.id)}
+                    disabled={removingSubId === sub.id}
+                  >
+                    {removingSubId === sub.id ? 'Removing…' : 'Remove'}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p className="form-help">
+              Each device sends its own copy of a reminder — remove any you no longer use to
+              stop duplicate notifications.
+            </p>
+          </>
+        )}
+      </div>
     </div>
   )
 }
