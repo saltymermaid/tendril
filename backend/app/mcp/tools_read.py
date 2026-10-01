@@ -8,7 +8,7 @@ relying on the tool-result serializer to know how.
 
 from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -421,11 +421,16 @@ async def list_tasks(
     category: str | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
+    include_undated: bool = True,
     limit: int = DEFAULT_LIST_LIMIT,
 ) -> list[dict]:
     """List tasks, optionally filtered by status (pending/completed/dismissed), source (auto/manual),
     category (watering/harvest/planting/seed_starting/pest_disease/maintenance/general), or due-date
-    range. Each task's remind_at (if set) is returned in the app's local timezone."""
+    range. Each task's remind_at (if set) is returned in the app's local timezone.
+
+    Tasks with no due date are still returned when a date range is given (they're "do whenever"
+    items that belong in a "what do I need to do today/this week" answer) — pass
+    include_undated=False to get only tasks actually due in the range."""
     async with async_session() as db:
         user = await get_mcp_user(db)
         stmt = (
@@ -441,10 +446,14 @@ async def list_tasks(
             stmt = stmt.where(Task.source == source)
         if category is not None:
             stmt = stmt.where(Task.category == category)
+        date_conds = []
         if start_date is not None:
-            stmt = stmt.where(Task.due_date >= start_date)
+            date_conds.append(Task.due_date >= start_date)
         if end_date is not None:
-            stmt = stmt.where(Task.due_date <= end_date)
+            date_conds.append(Task.due_date <= end_date)
+        if date_conds:
+            in_range = and_(*date_conds)
+            stmt = stmt.where(or_(in_range, Task.due_date.is_(None)) if include_undated else in_range)
 
         result = await db.execute(stmt)
         return [

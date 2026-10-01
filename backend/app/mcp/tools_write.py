@@ -1,10 +1,11 @@
 """Narrow write MCP tools — create/update varieties and categories, create/edit/delete a
 planting, complete a planting, create/edit a task, change a task's status, create a plant
-start. update_planting and delete_planting are both restricted to not_started plantings —
-editing or removing something already in the ground stays REST/UI-only (see complete_planting
-for recording an actual removal). No container/yard/plant-start mutations beyond creation,
-by design (see the plan's confirmed v1 write scope) — variety and category writes were added
-on top of that scope so the catalog can be maintained from an MCP client.
+start, edit a container's name/location/irrigation. update_planting and delete_planting are both
+restricted to not_started plantings — editing or removing something already in the ground stays
+REST/UI-only (see complete_planting for recording an actual removal). No yard/plant-start
+mutations beyond creation, and no container resize/create/delete, by design (see the plan's
+confirmed v1 write scope) — variety, category, and container-detail writes were added on top of
+that scope so the garden can be maintained from an MCP client.
 
 end_date must be computed from seed_start_date (or the referenced plant start's start_date)
 when transplanting, not from start_date — days_to_harvest on Variety is measured from seed,
@@ -38,6 +39,7 @@ from app.models.task import TASK_CATEGORIES, Task
 from app.models.variety import Variety
 from app.mcp.tools_read import (
     _category_dict,
+    _container_dict,
     _get_category_detail,
     _local_iso,
     _planting_dict,
@@ -51,6 +53,9 @@ VALID_REMOVAL_REASONS = {"harvest_complete", "died", "pulled_early", "pest_disea
 VALID_PLANTING_METHODS = {"direct_sow", "transplant", "both"}
 VALID_HARVEST_TYPES = {"single", "continuous"}
 VALID_TASK_STATUSES = {"pending", "completed", "dismissed"}
+# Same options the container form offers (frontend/src/pages/ContainerFormPage.tsx).
+VALID_IRRIGATION_TYPES = {"drip", "manual", "sprinkler"}
+VALID_IRRIGATION_FREQUENCIES = {"daily", "2x_daily", "every_2_days", "every_3_days", "weekly"}
 
 
 def _planting_season_from_dict(category_id: int, ps: dict) -> PlantingSeason:
@@ -511,6 +516,39 @@ def _task_dict(t: Task) -> dict:
     }
 
 
+async def _resolve_task_links(
+    db, user, container_id: int | None, planting_id: int | None, variety_id: int | None
+) -> tuple[int | None, int | None, int | None]:
+    """Check that each given link belongs to the user, and fill in container_id/variety_id from
+    the planting when only planting_id is given (so "harvest the roselle in Bed 5" links all
+    three). Returns the (container_id, planting_id, variety_id) to store; 0 passes through as-is
+    for update_task's "clear this link" meaning."""
+    if planting_id:
+        result = await db.execute(
+            select(Planting).where(Planting.id == planting_id, Planting.user_id == user.id)
+        )
+        planting = result.scalar_one_or_none()
+        if not planting:
+            raise ToolError(f"Planting {planting_id} not found")
+        if container_id is None:
+            container_id = planting.container_id
+        if variety_id is None:
+            variety_id = planting.variety_id
+    if container_id:
+        result = await db.execute(
+            select(Container.id).where(Container.id == container_id, Container.user_id == user.id)
+        )
+        if result.scalar_one_or_none() is None:
+            raise ToolError(f"Container {container_id} not found")
+    if variety_id:
+        result = await db.execute(
+            select(Variety.id).where(Variety.id == variety_id, Variety.user_id == user.id)
+        )
+        if result.scalar_one_or_none() is None:
+            raise ToolError(f"Variety {variety_id} not found")
+    return container_id, planting_id, variety_id
+
+
 @mcp_server.tool()
 async def create_task(
     title: str,
@@ -530,12 +568,19 @@ async def create_task(
     remind_at, if given, schedules a push notification: pass it as local time
     (America/New_York, where the garden is) with no timezone offset, e.g.
     "2026-09-27T18:00:00" for 6pm tomorrow — it's interpreted as local time automatically.
+
+    Link the task to what it's about: container_id for a bed or the tower (see list_containers),
+    planting_id for a specific planting — passing only planting_id also fills in its container
+    and variety.
     """
     if category not in TASK_CATEGORIES:
         raise ToolError(f"category must be one of: {', '.join(sorted(TASK_CATEGORIES))}")
 
     async with async_session() as db:
         user = await get_mcp_user(db)
+        container_id, planting_id, variety_id = await _resolve_task_links(
+            db, user, container_id, planting_id, variety_id
+        )
         task = Task(
             user_id=user.id,
             title=title,
@@ -580,10 +625,16 @@ async def update_task(
     due_date: date | None = None,
     category: str | None = None,
     remind_at: datetime | None = None,
+    container_id: int | None = None,
+    planting_id: int | None = None,
+    variety_id: int | None = None,
 ) -> dict:
-    """Edit an existing task's title, description, due date, category, or reminder time.
-    Only the fields you pass are changed. Rescheduling remind_at lets it fire again even
-    if the previous reminder already went out. To change status, use update_task_status."""
+    """Edit an existing task's title, description, due date, category, reminder time, or what
+    it's linked to (container_id / planting_id / variety_id). Only the fields you pass are
+    changed. Passing only planting_id also re-links the task to that planting's container and
+    variety. Pass 0 for a link to remove it (e.g. container_id=0 unlinks the task from its bed).
+    Rescheduling remind_at lets it fire again even if the previous reminder already went out.
+    To change status, use update_task_status."""
     if category is not None and category not in TASK_CATEGORIES:
         raise ToolError(f"category must be one of: {', '.join(sorted(TASK_CATEGORIES))}")
 
@@ -605,6 +656,17 @@ async def update_task(
         if remind_at is not None:
             task.remind_at = to_utc(remind_at)
             task.reminder_sent = False
+
+        container_id, planting_id, variety_id = await _resolve_task_links(
+            db, user, container_id, planting_id, variety_id
+        )
+        for field, value in (
+            ("container_id", container_id),
+            ("planting_id", planting_id),
+            ("variety_id", variety_id),
+        ):
+            if value is not None:
+                setattr(task, field, value or None)
 
         await db.commit()
         return _task_dict(task)
@@ -694,3 +756,52 @@ async def update_category(
 
         loaded = await _get_category_detail(db, category_id)
         return _category_dict(loaded)
+
+
+@mcp_server.tool()
+async def update_container(
+    container_id: int,
+    name: str | None = None,
+    location_description: str | None = None,
+    irrigation_type: str | None = None,
+    irrigation_duration_minutes: int | None = None,
+    irrigation_frequency: str | None = None,
+) -> dict:
+    """Rename a container (grid bed or tower) or change its location description or irrigation
+    setup. Only the fields you pass are changed. irrigation_type must be one of: drip, manual,
+    sprinkler; irrigation_frequency one of: daily, 2x_daily, every_2_days, every_3_days, weekly.
+    Size/shape (width, height, levels, pockets) can't be changed here — resizing could strand
+    plantings outside the grid, so that stays in the app's edit form."""
+    if irrigation_type is not None and irrigation_type not in VALID_IRRIGATION_TYPES:
+        raise ToolError(f"irrigation_type must be one of: {', '.join(sorted(VALID_IRRIGATION_TYPES))}")
+    if irrigation_frequency is not None and irrigation_frequency not in VALID_IRRIGATION_FREQUENCIES:
+        raise ToolError(
+            f"irrigation_frequency must be one of: {', '.join(sorted(VALID_IRRIGATION_FREQUENCIES))}"
+        )
+    if irrigation_duration_minutes is not None and irrigation_duration_minutes <= 0:
+        raise ToolError("irrigation_duration_minutes must be positive")
+    if name is not None and not name.strip():
+        raise ToolError("name can't be blank")
+
+    async with async_session() as db:
+        user = await get_mcp_user(db)
+        result = await db.execute(
+            select(Container).where(Container.id == container_id, Container.user_id == user.id)
+        )
+        container = result.scalar_one_or_none()
+        if not container:
+            raise ToolError(f"Container {container_id} not found")
+
+        updates = {
+            "name": name.strip() if name is not None else None,
+            "location_description": location_description,
+            "irrigation_type": irrigation_type,
+            "irrigation_duration_minutes": irrigation_duration_minutes,
+            "irrigation_frequency": irrigation_frequency,
+        }
+        for field, value in updates.items():
+            if value is not None:
+                setattr(container, field, value)
+
+        await db.commit()
+        return _container_dict(container)
