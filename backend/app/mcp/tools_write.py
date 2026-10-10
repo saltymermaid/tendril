@@ -1,11 +1,11 @@
 """Narrow write MCP tools — create/update varieties and categories, create/edit/delete a
-planting, complete a planting, create/edit a task, change a task's status, create a plant
-start, edit a container's name/location/irrigation. update_planting and delete_planting are both
-restricted to not_started plantings — editing or removing something already in the ground stays
-REST/UI-only (see complete_planting for recording an actual removal). No yard/plant-start
-mutations beyond creation, and no container resize/create/delete, by design (see the plan's
-confirmed v1 write scope) — variety, category, and container-detail writes were added on top of
-that scope so the garden can be maintained from an MCP client.
+planting, complete a planting, create/edit a task, change a task's status, create/edit/delete a
+plant start, edit a container's name/location/irrigation. update_planting and delete_planting are
+both restricted to not_started plantings — editing or removing something already in the ground
+stays REST/UI-only (see complete_planting for recording an actual removal). No yard mutations, and
+no container resize/create/delete, by design (see the plan's confirmed v1 write scope) — variety,
+category, plant-start, and container-detail writes were added on top of that scope so the garden
+can be maintained from an MCP client.
 
 end_date must be computed from seed_start_date (or the referenced plant start's start_date)
 when transplanting, not from start_date — days_to_harvest on Variety is measured from seed,
@@ -497,6 +497,69 @@ async def create_plant_start(variety_id: int, start_date: date, quantity: int = 
             select(PlantStart).options(selectinload(PlantStart.variety)).where(PlantStart.id == start.id)
         )
         return _plant_start_dict(result.scalar_one())
+
+
+@mcp_server.tool()
+async def update_plant_start(
+    start_id: int,
+    variety_id: int | None = None,
+    start_date: date | None = None,
+    quantity: int | None = None,
+) -> dict:
+    """Edit a plant start's variety, start date, or remaining quantity — only the fields you
+    pass are changed. quantity is what's left in the tray (not yet planted), so set it to 0 if
+    the rest died or were given away. Plantings already transplanted from this start keep their
+    own seed_start_date; changing start_date here doesn't rewrite them (use update_planting)."""
+    if quantity is not None and quantity < 0:
+        raise ToolError("quantity cannot be negative")
+
+    async with async_session() as db:
+        user = await get_mcp_user(db)
+
+        result = await db.execute(
+            select(PlantStart).where(PlantStart.id == start_id, PlantStart.user_id == user.id)
+        )
+        start = result.scalar_one_or_none()
+        if not start:
+            raise ToolError(f"Plant start {start_id} not found")
+
+        if variety_id is not None and variety_id != start.variety_id:
+            result = await db.execute(select(Variety).where(Variety.id == variety_id, Variety.user_id == user.id))
+            if not result.scalar_one_or_none():
+                raise ToolError(f"Variety {variety_id} not found")
+            start.variety_id = variety_id
+        if start_date is not None:
+            start.start_date = start_date
+        if quantity is not None:
+            start.quantity = quantity
+
+        await db.commit()
+
+        result = await db.execute(
+            select(PlantStart).options(selectinload(PlantStart.variety)).where(PlantStart.id == start_id)
+        )
+        return _plant_start_dict(result.scalar_one())
+
+
+@mcp_server.tool()
+async def delete_plant_start(start_id: int) -> dict:
+    """Delete a plant start outright — for a batch entered by mistake or one that failed
+    entirely. Plantings already transplanted from it are kept (they just lose the link back to
+    this start; their seed_start_date is unaffected). To record that some seedlings are gone but
+    keep the rest, use update_plant_start to lower quantity instead."""
+    async with async_session() as db:
+        user = await get_mcp_user(db)
+
+        result = await db.execute(
+            select(PlantStart).where(PlantStart.id == start_id, PlantStart.user_id == user.id)
+        )
+        start = result.scalar_one_or_none()
+        if not start:
+            raise ToolError(f"Plant start {start_id} not found")
+
+        await db.delete(start)
+        await db.commit()
+        return {"deleted": True, "start_id": start_id}
 
 
 def _task_dict(t: Task) -> dict:
