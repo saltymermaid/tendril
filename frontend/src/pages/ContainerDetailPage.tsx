@@ -574,7 +574,7 @@ export function ContainerDetailPage() {
 
   const selectedVarietyObj = varieties.find(v => v.id === selectedVariety) || null
 
-  const matchingStarts = plantStarts.filter((s: PlantStart) => s.variety_id === selectedVariety)
+  const matchingStarts = plantStarts.filter((s: PlantStart) => s.variety_id === selectedVariety && s.quantity > 0)
 
   function selectStart(s: PlantStart) {
     if (selectedStartId === s.id) {

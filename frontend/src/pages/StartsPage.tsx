@@ -2,6 +2,15 @@ import { apiFetch } from "../lib/api"
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
+interface PlantStartAllocation {
+  planting_id: number
+  container_id: number
+  container_name: string | null
+  start_date: string
+  status: 'not_started' | 'in_progress' | 'complete'
+  quantity: number
+}
+
 interface PlantStart {
   id: number
   variety_id: number
@@ -9,7 +18,11 @@ interface PlantStart {
   category_name: string | null
   category_color: string | null
   start_date: string
-  quantity: number
+  quantity: number // available — not yet assigned to a bed
+  planned_quantity: number // reserved by a planned planting, still in the tray
+  transplanted_quantity: number // already in the ground
+  total_quantity: number
+  allocations: PlantStartAllocation[]
 }
 
 interface Variety {
@@ -24,12 +37,24 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function formatShortDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+const UNCATEGORIZED = 'Uncategorized'
+
+function categoryOf(s: PlantStart): string {
+  return s.category_name || UNCATEGORIZED
+}
+
 export function StartsPage() {
   const [starts, setStarts] = useState<PlantStart[]>([])
   const [varieties, setVarieties] = useState<Variety[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showUsed, setShowUsed] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [form, setForm] = useState({
@@ -115,7 +140,12 @@ export function StartsPage() {
 
   async function adjustQuantity(start: PlantStart, delta: number) {
     const newQuantity = Math.max(0, start.quantity + delta)
-    setStarts((prev) => prev.map((s) => (s.id === start.id ? { ...s, quantity: newQuantity } : s)))
+    const totalDelta = newQuantity - start.quantity
+    setStarts((prev) =>
+      prev.map((s) =>
+        s.id === start.id ? { ...s, quantity: newQuantity, total_quantity: s.total_quantity + totalDelta } : s
+      )
+    )
     try {
       const res = await apiFetch(`/api/plant-starts/${start.id}`, {
         method: 'PUT',
@@ -123,7 +153,7 @@ export function StartsPage() {
         body: JSON.stringify({ quantity: newQuantity }),
       })
       if (!res.ok) throw new Error()
-      if (newQuantity === 0 && !showUsed) {
+      if (newQuantity === 0 && start.planned_quantity === 0 && !showUsed) {
         setStarts((prev) => prev.filter((s) => s.id !== start.id))
       }
     } catch {
@@ -141,6 +171,22 @@ export function StartsPage() {
     }
   }
 
+  // Pill counts: available / still in trays (available + planned). Transplanted
+  // seedlings are in the ground, so they no longer count as starts on hand.
+  const categoryPills = Array.from(
+    starts.reduce((acc, s) => {
+      const name = categoryOf(s)
+      const entry = acc.get(name) || { color: s.category_color || '#ccc', available: 0, inTray: 0 }
+      entry.available += s.quantity
+      entry.inTray += s.quantity + s.planned_quantity
+      acc.set(name, entry)
+      return acc
+    }, new Map<string, { color: string; available: number; inTray: number }>())
+  ).sort((a, b) => a[0].localeCompare(b[0]))
+
+  const activeFilter = categoryPills.some(([name]) => name === categoryFilter) ? categoryFilter : null
+  const visibleStarts = activeFilter ? starts.filter((s) => categoryOf(s) === activeFilter) : starts
+
   if (loading) {
     return (
       <div className="loading-screen">
@@ -156,7 +202,7 @@ export function StartsPage() {
         <div>
           <h2>Starts</h2>
           <p className="page-subtitle">
-            Seedlings you've started but haven't planted into a bed yet
+            Seedlings in your trays — planned ones are reserved for a bed until they go in the ground
           </p>
         </div>
         <div className="page-actions">
@@ -165,6 +211,30 @@ export function StartsPage() {
           </button>
         </div>
       </div>
+
+      {categoryPills.length > 0 && (
+        <div className="category-filter-chips starts-filter-chips">
+          <button
+            type="button"
+            className={`chip ${!activeFilter ? 'active' : ''}`}
+            onClick={() => setCategoryFilter(null)}
+          >
+            All
+          </button>
+          {categoryPills.map(([name, { color, available, inTray }]) => (
+            <button
+              key={name}
+              type="button"
+              className={`chip ${activeFilter === name ? 'active' : ''}`}
+              style={activeFilter === name ? { backgroundColor: color, borderColor: color, color: '#fff' } : undefined}
+              onClick={() => setCategoryFilter(activeFilter === name ? null : name)}
+              title={`${available} available of ${inTray} in trays`}
+            >
+              {name} <span className="chip-count">{available}/{inTray}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <label className="form-label" style={{ marginBottom: 'var(--space-3)', display: 'inline-flex', alignItems: 'center' }}>
         <input
@@ -192,8 +262,11 @@ export function StartsPage() {
         </div>
       ) : (
         <div className="task-list">
-          {starts.map((s) => (
-            <div key={s.id} className={`task-card ${s.quantity === 0 ? 'task-done' : ''}`}>
+          {visibleStarts.map((s) => (
+            <div
+              key={s.id}
+              className={`task-card ${s.quantity === 0 && s.planned_quantity === 0 ? 'task-done' : ''}`}
+            >
               <div className="task-card-main">
                 <div className="task-card-header">
                   <span
@@ -206,23 +279,25 @@ export function StartsPage() {
                   <span className="task-due">📅 Started {formatDate(s.start_date)}</span>
                   {s.category_name && <span className="task-variety">{s.category_name}</span>}
                 </div>
+                <StartBreakdown start={s} />
               </div>
               <div className="task-card-actions">
                 <button
-                  className="btn btn-sm btn-outline"
+                  className="btn btn-sm btn-outline-dark"
                   onClick={() => adjustQuantity(s, -1)}
                   disabled={s.quantity === 0}
-                  title="Decrease quantity"
+                  title="Decrease available (e.g. a seedling died)"
                 >
                   −
                 </button>
-                <span style={{ minWidth: '2ch', textAlign: 'center', fontWeight: 600 }}>
+                <span className="start-available-count" title="Available to assign">
                   {s.quantity}
+                  <small>avail</small>
                 </span>
                 <button
-                  className="btn btn-sm btn-outline"
+                  className="btn btn-sm btn-outline-dark"
                   onClick={() => adjustQuantity(s, 1)}
-                  title="Increase quantity"
+                  title="Increase available"
                 >
                   +
                 </button>
@@ -304,7 +379,7 @@ export function StartsPage() {
               {formError && <div className="form-message error">{formError}</div>}
 
               <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={() => setShowAddModal(false)}>
+                <button type="button" className="btn btn-outline-dark" onClick={() => setShowAddModal(false)}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={submitting}>
@@ -314,6 +389,49 @@ export function StartsPage() {
             </form>
           </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+function StartBreakdown({ start }: { start: PlantStart }) {
+  const { total_quantity: total, transplanted_quantity: transplanted, planned_quantity: planned, quantity: available } = start
+  if (total === 0) return null
+
+  const plannedAllocations = start.allocations.filter((a) => a.status === 'not_started')
+  const segments = [
+    { key: 'transplanted', count: transplanted },
+    { key: 'planned', count: planned },
+    { key: 'available', count: available },
+  ].filter((seg) => seg.count > 0)
+
+  return (
+    <div className="start-breakdown">
+      <div className="start-breakdown-bar" aria-hidden="true">
+        {segments.map((seg) => (
+          <span
+            key={seg.key}
+            className={`start-breakdown-seg seg-${seg.key}`}
+            style={{ flexGrow: seg.count }}
+          />
+        ))}
+      </div>
+      <div className="start-breakdown-legend">
+        <span>{total} started</span>
+        {transplanted > 0 && <span className="legend-transplanted">{transplanted} in ground</span>}
+        {planned > 0 && <span className="legend-planned">{planned} planned</span>}
+        <span className="legend-available">{available} available</span>
+      </div>
+      {plannedAllocations.length > 0 && (
+        <ul className="start-allocations">
+          {plannedAllocations.map((a) => (
+            <li key={a.planting_id}>
+              <Link to={`/containers/${a.container_id}`}>
+                {a.quantity} → {a.container_name || 'bed'} on {formatShortDate(a.start_date)}
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )

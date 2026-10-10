@@ -230,6 +230,26 @@ async def _consume_plant_start(
     return start
 
 
+async def _rebalance_plant_start(db: AsyncSession, planting: Planting, new_quantity: int | None) -> None:
+    """When a start-linked planting's quantity changes, move the difference back to (or
+    out of) the start's available count so seedlings aren't double-counted.
+
+    Shared by the REST update route and the MCP update_planting tool. Does not commit.
+    """
+    if planting.start_id is None:
+        return
+    delta = (new_quantity or 1) - (planting.quantity or 1)
+    if delta == 0:
+        return
+    result = await db.execute(select(PlantStart).where(PlantStart.id == planting.start_id))
+    start = result.scalar_one_or_none()
+    if not start:
+        return
+    if delta > start.quantity:
+        raise HTTPException(status_code=400, detail="Not enough remaining in this start")
+    start.quantity -= delta
+
+
 # --- Create planting ---
 @router.post("", response_model=PlantingResponse, status_code=status.HTTP_201_CREATED)
 async def create_planting(
@@ -518,6 +538,9 @@ async def update_planting(
             end_date=new_end,
             exclude_planting_id=planting.id,
         )
+
+    if "quantity" in update_data:
+        await _rebalance_plant_start(db, planting, update_data["quantity"])
 
     for key, value in update_data.items():
         setattr(planting, key, value)

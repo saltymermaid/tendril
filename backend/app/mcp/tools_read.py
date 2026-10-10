@@ -194,31 +194,60 @@ async def get_category(category_id: int) -> dict:
         return _category_dict(category)
 
 
+def _plant_start_options():
+    """Relationships _plant_start_dict needs — the breakdown reads plantings."""
+    return (
+        selectinload(PlantStart.variety).selectinload(Variety.category),
+        selectinload(PlantStart.plantings).selectinload(Planting.container),
+    )
+
+
 def _plant_start_dict(s: PlantStart) -> dict:
     return {
         "id": s.id,
         "variety_id": s.variety_id,
         "variety_name": s.variety.name if s.variety else None,
+        "category_name": s.variety.category.name if s.variety and s.variety.category else None,
         "start_date": _iso(s.start_date),
-        "quantity": s.quantity,
+        "quantity": s.quantity,  # available — not yet assigned to a bed
+        "planned_quantity": s.planned_quantity,
+        "transplanted_quantity": s.transplanted_quantity,
+        "total_quantity": s.total_quantity,
+        "allocations": [
+            {
+                "planting_id": p.id,
+                "container_id": p.container_id,
+                "container_name": p.container.name if p.container else None,
+                "start_date": _iso(p.start_date),
+                "status": p.status,
+                "quantity": p.quantity or 1,
+            }
+            for p in sorted(s.plantings, key=lambda p: p.start_date)
+        ],
     }
 
 
 @mcp_server.tool()
 async def list_plant_starts(include_used: bool = False, limit: int = DEFAULT_LIST_LIMIT) -> list[dict]:
-    """List the user's plant starts (started seedlings not yet assigned to a bed), newest
-    first. Excludes used-up (quantity 0) starts unless include_used is set."""
+    """List the user's plant starts (batches of seedlings started in trays), newest first.
+    `quantity` is how many are still available to assign via create_planting's start_id;
+    `planned_quantity` are reserved by planned (not_started) plantings but still in the tray;
+    `transplanted_quantity` are already in the ground. `allocations` lists the plantings
+    each start's seedlings went (or are planned to go) to. Excludes used-up starts (nothing
+    available or planned) unless include_used is set."""
     async with async_session() as db:
         user = await get_mcp_user(db)
         stmt = (
             select(PlantStart)
-            .options(selectinload(PlantStart.variety))
+            .options(*_plant_start_options())
             .where(PlantStart.user_id == user.id)
             .order_by(PlantStart.start_date.desc())
             .limit(limit)
         )
         if not include_used:
-            stmt = stmt.where(PlantStart.quantity > 0)
+            stmt = stmt.where(
+                or_(PlantStart.quantity > 0, PlantStart.plantings.any(Planting.status == "not_started"))
+            )
         result = await db.execute(stmt)
         return [_plant_start_dict(s) for s in result.scalars().all()]
 

@@ -10,7 +10,12 @@ from app.database import Base
 
 class PlantStart(Base):
     """A started batch of a variety (e.g. seeded in trays), with a remaining quantity
-    not yet planted into a bed. Per-user data. No location — just variety, date, quantity."""
+    not yet planted into a bed. Per-user data. No location — just variety, date, quantity.
+
+    `quantity` is what's still available to assign. Seedlings assigned to a bed are
+    subtracted from it and tracked via the linked plantings: a `not_started` planting
+    reserves them (still in the tray, but spoken for); once the planting is in progress
+    or complete they've been transplanted. Breakdown properties need `plantings` loaded."""
 
     __tablename__ = "plant_starts"
 
@@ -33,6 +38,20 @@ class PlantStart(Base):
     user: Mapped["User"] = relationship(back_populates="plant_starts")  # noqa: F821
     variety: Mapped["Variety"] = relationship(back_populates="plant_starts")  # noqa: F821
     plantings: Mapped[list["Planting"]] = relationship(back_populates="plant_start")  # noqa: F821
+
+    @property
+    def planned_quantity(self) -> int:
+        """Seedlings reserved by planned (not_started) plantings — still in the tray."""
+        return sum(p.quantity or 1 for p in self.plantings if p.status == "not_started")
+
+    @property
+    def transplanted_quantity(self) -> int:
+        """Seedlings already in the ground (in_progress or complete plantings)."""
+        return sum(p.quantity or 1 for p in self.plantings if p.status != "not_started")
+
+    @property
+    def total_quantity(self) -> int:
+        return self.quantity + self.planned_quantity + self.transplanted_quantity
 
     def __repr__(self) -> str:
         return f"<PlantStart(id={self.id}, variety_id={self.variety_id}, quantity={self.quantity})>"

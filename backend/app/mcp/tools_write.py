@@ -44,9 +44,15 @@ from app.mcp.tools_read import (
     _local_iso,
     _planting_dict,
     _plant_start_dict,
+    _plant_start_options,
     _variety_dict,
 )
-from app.routers.plantings import _check_overlap, _consume_plant_start, validate_planting_bounds
+from app.routers.plantings import (
+    _check_overlap,
+    _consume_plant_start,
+    _rebalance_plant_start,
+    validate_planting_bounds,
+)
 from app.services.localtime import to_utc
 
 VALID_REMOVAL_REASONS = {"harvest_complete", "died", "pulled_early", "pest_disease", "other"}
@@ -480,6 +486,10 @@ async def update_planting(
         if planting_method is not None:
             planting.planting_method = planting_method
         if quantity is not None:
+            try:
+                await _rebalance_plant_start(db, planting, quantity)
+            except HTTPException as exc:
+                raise ToolError(exc.detail) from exc
             planting.quantity = quantity
 
         await db.commit()
@@ -542,7 +552,7 @@ async def create_plant_start(variety_id: int, start_date: date, quantity: int = 
         await db.commit()
 
         result = await db.execute(
-            select(PlantStart).options(selectinload(PlantStart.variety)).where(PlantStart.id == start.id)
+            select(PlantStart).options(*_plant_start_options()).where(PlantStart.id == start.id)
         )
         return _plant_start_dict(result.scalar_one())
 
@@ -554,10 +564,13 @@ async def update_plant_start(
     start_date: date | None = None,
     quantity: int | None = None,
 ) -> dict:
-    """Edit a plant start's variety, start date, or remaining quantity — only the fields you
-    pass are changed. quantity is what's left in the tray (not yet planted), so set it to 0 if
-    the rest died or were given away. Plantings already transplanted from this start keep their
-    own seed_start_date; changing start_date here doesn't rewrite them (use update_planting)."""
+    """Edit a plant start's variety, start date, or available quantity — only the fields you
+    pass are changed. quantity is what's still unassigned in the tray (seedlings reserved by a
+    planned planting aren't included), so set it to 0 if the rest died or were given away. To
+    release reserved seedlings, delete or edit the planned planting instead. The variety can't
+    be changed once any of the start is assigned to a bed. Plantings already transplanted from
+    this start keep their own seed_start_date; changing start_date here doesn't rewrite them
+    (use update_planting)."""
     if quantity is not None and quantity < 0:
         raise ToolError("quantity cannot be negative")
 
@@ -565,7 +578,9 @@ async def update_plant_start(
         user = await get_mcp_user(db)
 
         result = await db.execute(
-            select(PlantStart).where(PlantStart.id == start_id, PlantStart.user_id == user.id)
+            select(PlantStart)
+            .options(selectinload(PlantStart.plantings))
+            .where(PlantStart.id == start_id, PlantStart.user_id == user.id)
         )
         start = result.scalar_one_or_none()
         if not start:
@@ -575,6 +590,8 @@ async def update_plant_start(
             result = await db.execute(select(Variety).where(Variety.id == variety_id, Variety.user_id == user.id))
             if not result.scalar_one_or_none():
                 raise ToolError(f"Variety {variety_id} not found")
+            if start.plantings:
+                raise ToolError("Can't change the variety of a start that's already assigned to a bed")
             start.variety_id = variety_id
         if start_date is not None:
             start.start_date = start_date
@@ -582,10 +599,9 @@ async def update_plant_start(
             start.quantity = quantity
 
         await db.commit()
+        db.expire_all()
 
-        result = await db.execute(
-            select(PlantStart).options(selectinload(PlantStart.variety)).where(PlantStart.id == start_id)
-        )
+        result = await db.execute(select(PlantStart).options(*_plant_start_options()).where(PlantStart.id == start_id))
         return _plant_start_dict(result.scalar_one())
 
 

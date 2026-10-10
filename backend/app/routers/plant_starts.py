@@ -1,16 +1,22 @@
 """Plant Start CRUD router — started seedlings not yet assigned to a bed."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.plant_start import PlantStart
+from app.models.planting import Planting
 from app.models.user import User
 from app.models.variety import Variety
-from app.schemas.plant_start import PlantStartCreate, PlantStartResponse, PlantStartUpdate
+from app.schemas.plant_start import (
+    PlantStartAllocation,
+    PlantStartCreate,
+    PlantStartResponse,
+    PlantStartUpdate,
+)
 
 router = APIRouter(prefix="/api/plant-starts", tags=["plant-starts"])
 
@@ -26,7 +32,28 @@ def _plant_start_to_response(start: PlantStart) -> PlantStartResponse:
         category_color=start.variety.category.color if start.variety and start.variety.category else None,
         start_date=start.start_date,
         quantity=start.quantity,
+        planned_quantity=start.planned_quantity,
+        transplanted_quantity=start.transplanted_quantity,
+        total_quantity=start.total_quantity,
+        allocations=[
+            PlantStartAllocation(
+                planting_id=p.id,
+                container_id=p.container_id,
+                container_name=p.container.name if p.container else None,
+                start_date=p.start_date,
+                status=p.status,
+                quantity=p.quantity or 1,
+            )
+            for p in sorted(start.plantings, key=lambda p: p.start_date)
+        ],
         created_at=start.created_at,
+    )
+
+
+def _with_relations(stmt):
+    return stmt.options(
+        selectinload(PlantStart.variety).selectinload(Variety.category),
+        selectinload(PlantStart.plantings).selectinload(Planting.container),
     )
 
 
@@ -36,17 +63,18 @@ async def list_plant_starts(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """List the current user's plant starts, newest first. Excludes used-up (quantity 0)
-    starts unless include_used is set."""
-    stmt = (
+    """List the current user's plant starts, newest first. Excludes used-up starts (none
+    available and none reserved by a planned planting) unless include_used is set."""
+    stmt = _with_relations(
         select(PlantStart)
-        .options(selectinload(PlantStart.variety).selectinload(Variety.category))
         .where(PlantStart.user_id == user.id)
         .order_by(PlantStart.start_date.desc())
     )
 
     if not include_used:
-        stmt = stmt.where(PlantStart.quantity > 0)
+        stmt = stmt.where(
+            or_(PlantStart.quantity > 0, PlantStart.plantings.any(Planting.status == "not_started"))
+        )
 
     result = await db.execute(stmt)
     starts = result.scalars().all()
@@ -71,11 +99,7 @@ async def create_plant_start(
     db.add(start)
     await db.commit()
 
-    result = await db.execute(
-        select(PlantStart)
-        .options(selectinload(PlantStart.variety).selectinload(Variety.category))
-        .where(PlantStart.id == start.id)
-    )
+    result = await db.execute(_with_relations(select(PlantStart).where(PlantStart.id == start.id)))
     return _plant_start_to_response(result.scalar_one())
 
 
@@ -86,11 +110,9 @@ async def update_plant_start(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Update a plant start's variety, start date, and/or quantity."""
+    """Update a plant start's variety, start date, and/or available quantity."""
     result = await db.execute(
-        select(PlantStart)
-        .options(selectinload(PlantStart.variety).selectinload(Variety.category))
-        .where(PlantStart.id == start_id, PlantStart.user_id == user.id)
+        _with_relations(select(PlantStart).where(PlantStart.id == start_id, PlantStart.user_id == user.id))
     )
     start = result.scalar_one_or_none()
     if not start:
@@ -104,6 +126,11 @@ async def update_plant_start(
         )
         if not variety_result.scalar_one_or_none():
             raise HTTPException(status_code=404, detail="Variety not found")
+        if start.plantings:
+            raise HTTPException(
+                status_code=400,
+                detail="Can't change the variety of a start that's already assigned to a bed",
+            )
 
     if "quantity" in update_data and update_data["quantity"] < 0:
         raise HTTPException(status_code=400, detail="quantity cannot be negative")
@@ -112,12 +139,9 @@ async def update_plant_start(
         setattr(start, field, value)
 
     await db.commit()
+    db.expire_all()
 
-    result = await db.execute(
-        select(PlantStart)
-        .options(selectinload(PlantStart.variety).selectinload(Variety.category))
-        .where(PlantStart.id == start_id)
-    )
+    result = await db.execute(_with_relations(select(PlantStart).where(PlantStart.id == start_id)))
     return _plant_start_to_response(result.scalar_one())
 
 
