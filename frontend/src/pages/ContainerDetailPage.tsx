@@ -98,6 +98,7 @@ interface RecommendationData {
   container_id: number
   square_x: number
   square_y: number
+  tower_level: number | null
   total_varieties: number
   categories: RecommendationCategory[]
 }
@@ -1634,7 +1635,11 @@ export function ContainerDetailPage() {
                               setRecommendations(null)
                               setSelectedVariety(v.variety_id)
                               if (recommendations) {
-                                openPlantingModal(recommendations.square_x, recommendations.square_y)
+                                openPlantingModal(
+                                  recommendations.square_x,
+                                  recommendations.square_y,
+                                  recommendations.tower_level ?? undefined,
+                                )
                                 // Pre-select the variety
                                 setTimeout(() => setSelectedVariety(v.variety_id), 50)
                               }
