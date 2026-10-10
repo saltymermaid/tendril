@@ -316,6 +316,7 @@ async def create_planting(
                 square_height=square_height,
                 start_date=start_date,
                 end_date=end_date,
+                tower_level=tower_level,
             )
             if start_id is not None:
                 consumed_start = await _consume_plant_start(
@@ -471,6 +472,7 @@ async def update_planting(
                 square_height=planting.square_height,
                 start_date=new_start,
                 end_date=new_end,
+                tower_level=planting.tower_level,
                 exclude_planting_id=planting.id,
             )
         except HTTPException as exc:

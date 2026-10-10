@@ -526,10 +526,12 @@ async def get_recommendations(
     square_x: int,
     square_y: int,
     target_date: date | None = None,
+    tower_level: int | None = None,
 ) -> dict:
     """'What can I plant here?' — recommend varieties for a specific square on a given date
     (defaults to today), scored by season fit, size fit, harvest-deadline fit, companion
-    planting, and support-structure match."""
+    planting, and support-structure match. For towers, pass tower_level (0-based) with
+    square_x as the pocket and square_y=0."""
     async with async_session() as db:
         user = await get_mcp_user(db)
         check_date = target_date or date.today()
@@ -540,12 +542,14 @@ async def get_recommendations(
             square_x=square_x,
             square_y=square_y,
             target_date=check_date,
+            tower_level=tower_level,
         )
         return {
             "date": _iso(check_date),
             "container_id": container_id,
             "square_x": square_x,
             "square_y": square_y,
+            "tower_level": tower_level,
             "recommendations": [
                 {
                     "variety_id": r.variety_id,

@@ -146,6 +146,28 @@ def validate_planting_bounds(
             )
 
 
+def _occupies_same_squares(
+    existing: Planting,
+    square_x: int,
+    square_y: int,
+    square_width: int,
+    square_height: int,
+    tower_level: int | None,
+) -> bool:
+    """Whether `existing` sits on any of the given squares (ignoring dates).
+
+    Tower plantings on different levels never share a pocket, even with the same square_x.
+    """
+    if tower_level is not None and existing.tower_level != tower_level:
+        return False
+    return (
+        square_x <= existing.square_x + existing.square_width - 1
+        and square_x + square_width - 1 >= existing.square_x
+        and square_y <= existing.square_y + existing.square_height - 1
+        and square_y + square_height - 1 >= existing.square_y
+    )
+
+
 async def _check_overlap(
     db: AsyncSession,
     user_id: int,
@@ -156,6 +178,7 @@ async def _check_overlap(
     square_height: int,
     start_date: date,
     end_date: date,
+    tower_level: int | None = None,
     exclude_planting_id: int | None = None,
 ) -> None:
     """Check for overlapping plantings on the same squares in the same date range.
@@ -163,6 +186,7 @@ async def _check_overlap(
     A planting occupies squares from (square_x, square_y) to
     (square_x + square_width - 1, square_y + square_height - 1).
     Two plantings overlap if their square ranges intersect AND their date ranges overlap.
+    For towers, pass tower_level — pockets only collide within the same level.
     """
     query = select(Planting).where(
         Planting.user_id == user_id,
@@ -177,21 +201,8 @@ async def _check_overlap(
     result = await db.execute(query)
     existing_plantings = result.scalars().all()
 
-    new_x_min, new_x_max = square_x, square_x + square_width - 1
-    new_y_min, new_y_max = square_y, square_y + square_height - 1
-
     for existing in existing_plantings:
-        ex_x_min = existing.square_x
-        ex_x_max = existing.square_x + existing.square_width - 1
-        ex_y_min = existing.square_y
-        ex_y_max = existing.square_y + existing.square_height - 1
-
-        if (
-            new_x_min <= ex_x_max
-            and new_x_max >= ex_x_min
-            and new_y_min <= ex_y_max
-            and new_y_max >= ex_y_min
-        ):
+        if _occupies_same_squares(existing, square_x, square_y, square_width, square_height, tower_level):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Overlap with existing planting (id={existing.id}) "
@@ -303,6 +314,7 @@ async def create_planting(
         square_height=body.square_height,
         start_date=body.start_date,
         end_date=body.end_date,
+        tower_level=body.tower_level,
     )
 
     seed_start_date = body.seed_start_date
@@ -536,6 +548,7 @@ async def update_planting(
             square_height=planting.square_height,
             start_date=new_start,
             end_date=new_end,
+            tower_level=planting.tower_level,
             exclude_planting_id=planting.id,
         )
 
@@ -603,6 +616,7 @@ async def activate_planting(
             square_height=planting.square_height,
             start_date=actual_start,
             end_date=planting.end_date,
+            tower_level=planting.tower_level,
             exclude_planting_id=planting.id,
         )
         planting.start_date = actual_start

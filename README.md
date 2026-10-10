@@ -49,7 +49,7 @@ Log in without setting up Google OAuth using the dev login endpoint:
 ```bash
 curl -X POST http://localhost:8000/api/auth/dev-login \
   -H "Content-Type: application/json" \
-  -d '{"email": "dev@tendril.dev"}'
+  -d '{"email": "dev@tendril.garden"}'
 ```
 
 ### Useful dev commands

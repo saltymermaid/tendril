@@ -32,6 +32,17 @@ class RecommendationResult:
     boosts: list[str] = field(default_factory=list)
 
 
+def _footprint(p: Planting, is_tower: bool) -> tuple[int, int, int, int]:
+    """A planting's (x, y, width, height) on the container's 2-D layout.
+
+    Towers are laid out as pocket (x) by level (y), one pocket per planting, so the
+    grid-style adjacency and occupancy checks below work unchanged for both types.
+    """
+    if is_tower:
+        return p.square_x, p.tower_level or 0, 1, 1
+    return p.square_x, p.square_y, p.square_width, p.square_height
+
+
 def _parse_spacing(spacing: str) -> tuple[int, int]:
     """Parse spacing string like '1x1' or '2x2' into (width, height)."""
     try:
@@ -96,9 +107,12 @@ async def get_recommendations(
     square_x: int,
     square_y: int,
     target_date: date,
+    tower_level: int | None = None,
     usda_zone: str = "10a",
 ) -> list[RecommendationResult]:
     """Get variety recommendations for a specific square on a given date.
+
+    For towers, pass tower_level; square_x is the pocket and square_y is ignored.
 
     Filtering:
     1. Planting season check (is the date within the variety's planting window?)
@@ -118,6 +132,9 @@ async def get_recommendations(
     container = result.scalar_one_or_none()
     if not container:
         return []
+
+    is_tower = container.type == "tower"
+    target_x, target_y = (square_x, tower_level or 0) if is_tower else (square_x, square_y)
 
     # Load all user varieties with categories
     var_result = await db.execute(
@@ -169,25 +186,23 @@ async def get_recommendations(
     # Filter future plantings to those occupying the target square
     next_deadline: date | None = None
     for p in future_plantings:
-        in_x = square_x >= p.square_x and square_x < p.square_x + p.square_width
-        in_y = square_y >= p.square_y and square_y < p.square_y + p.square_height
-        if in_x and in_y:
+        px, py, pw, ph = _footprint(p, is_tower)
+        if px <= target_x < px + pw and py <= target_y < py + ph:
             if next_deadline is None or p.start_date < next_deadline:
                 next_deadline = p.start_date
 
     # Get neighbor category IDs (adjacent squares)
     neighbor_category_ids: set[int] = set()
     for p in active_plantings:
-        # Check if planting is adjacent to target square
+        # Check if planting is adjacent to target square (for towers: neighboring
+        # pockets on the same level and the levels directly above/below)
+        px, py, pw, ph = _footprint(p, is_tower)
         for dx in range(-1, 2):
             for dy in range(-1, 2):
                 if dx == 0 and dy == 0:
                     continue
-                adj_x, adj_y = square_x + dx, square_y + dy
-                if (
-                    p.square_x <= adj_x < p.square_x + p.square_width
-                    and p.square_y <= adj_y < p.square_y + p.square_height
-                ):
+                adj_x, adj_y = target_x + dx, target_y + dy
+                if px <= adj_x < px + pw and py <= adj_y < py + ph:
                     if p.variety:
                         neighbor_category_ids.add(p.variety.category_id)
 
@@ -198,9 +213,12 @@ async def get_recommendations(
             support_at_square = s.support_type
             break
 
-    # Available space from target square
-    max_width = (container.width or 1) - square_x
-    max_height = (container.height or 1) - square_y
+    # Available space from target square (a tower pocket holds a single 1x1 planting)
+    if is_tower:
+        max_width = max_height = 1
+    else:
+        max_width = (container.width or 1) - square_x
+        max_height = (container.height or 1) - square_y
 
     results: list[RecommendationResult] = []
 

@@ -18,6 +18,7 @@ async def recommend(
     container_id: int = Query(..., description="Container ID"),
     square_x: int = Query(..., description="Target square X coordinate"),
     square_y: int = Query(..., description="Target square Y coordinate"),
+    tower_level: int | None = Query(None, description="Tower level (towers only; square_x is the pocket)"),
     target_date: date = Query(None, alias="date", description="Date to check (defaults to today)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -32,6 +33,7 @@ async def recommend(
         square_x=square_x,
         square_y=square_y,
         target_date=check_date,
+        tower_level=tower_level,
     )
 
     # Group by category
@@ -69,6 +71,7 @@ async def recommend(
         "container_id": container_id,
         "square_x": square_x,
         "square_y": square_y,
+        "tower_level": tower_level,
         "total_varieties": len(results),
         "categories": sorted_categories,
     }

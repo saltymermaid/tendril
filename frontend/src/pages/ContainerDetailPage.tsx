@@ -601,10 +601,11 @@ export function ContainerDetailPage() {
     (s: PlantStart) => !startPickerCategory || (s.category_name || 'Uncategorized') === startPickerCategory
   )
 
-  function computeNextAvailable(x: number, y: number): string {
-    // Find the latest end_date of any planting occupying this square
+  function computeNextAvailable(x: number, y: number, towerLevel?: number): string {
+    // Find the latest end_date of any planting occupying this square (or tower pocket)
     let maxEnd = todayStr
     for (const p of plantings) {
+      if (towerLevel !== undefined && p.tower_level !== towerLevel) continue
       const inX = x >= p.square_x && x < p.square_x + p.square_width
       const inY = y >= p.square_y && y < p.square_y + p.square_height
       if (inX && inY && p.end_date > maxEnd) {
@@ -615,7 +616,7 @@ export function ContainerDetailPage() {
   }
 
   async function fetchRecommendations(x: number, y: number, towerLevel?: number, dateOverride?: string) {
-    const dateToUse = dateOverride ?? computeNextAvailable(x, y)
+    const dateToUse = dateOverride ?? computeNextAvailable(x, y, towerLevel)
     setRecDate(dateToUse)
     setRecLoading(true)
     setRecommendations(null)
@@ -623,7 +624,8 @@ export function ContainerDetailPage() {
     setRecSquare({ x, y, towerLevel })
     try {
       const res = await apiFetch(
-        `/api/recommendations?container_id=${id}&square_x=${x}&square_y=${y}&date=${dateToUse}`
+        `/api/recommendations?container_id=${id}&square_x=${x}&square_y=${y}&date=${dateToUse}` +
+          (towerLevel !== undefined ? `&tower_level=${towerLevel}` : '')
       )
       if (!res.ok) throw new Error('Failed to load recommendations')
       setRecommendations(await res.json())
@@ -1563,12 +1565,12 @@ export function ContainerDetailPage() {
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
                 <h3 style={{ margin: 0 }}>
                   💡 Recommendations —{' '}
-                  {recommendations
-                    ? `${ROW_LABELS[recommendations.square_y]}${recommendations.square_x + 1}`
-                    : recSquare
-                      ? (recSquare.towerLevel !== undefined
-                          ? `Level ${recSquare.towerLevel + 1}, Pocket ${recSquare.x + 1}`
-                          : `${ROW_LABELS[recSquare.y]}${recSquare.x + 1}`)
+                  {recSquare
+                    ? (recSquare.towerLevel !== undefined
+                        ? `Level ${recSquare.towerLevel + 1}, Pocket ${recSquare.x + 1}`
+                        : `${ROW_LABELS[recSquare.y]}${recSquare.x + 1}`)
+                    : recommendations
+                      ? `${ROW_LABELS[recommendations.square_y]}${recommendations.square_x + 1}`
                       : '...'}
                 </h3>
                 <input
