@@ -17,6 +17,11 @@ class Category(Base):
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     color: Mapped[str] = mapped_column(String(7), nullable=False)  # Hex color e.g. #FF5733
     harvest_type: Mapped[str] = mapped_column(String(20), nullable=False, default="continuous")  # single/continuous
+    # Harvest forecast defaults — each variety inherits these unless it sets its own
+    harvest_unit: Mapped[str | None] = mapped_column(String(30), nullable=True)  # Singular noun: head, bunch, root
+    plants_per_square: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )  # Plants in one planting's footprint (16 radishes in a 1x1, 1 tomato in a 2x2)
     icon_svg: Mapped[str | None] = mapped_column(Text, nullable=True)  # SVG markup or emoji placeholder
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

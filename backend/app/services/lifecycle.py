@@ -100,13 +100,14 @@ def compute_lifecycle_phase(
 
     # Use average of min/max for germination and harvest timing
     germ_days = _avg_days(days_to_germination_min, days_to_germination_max, default=7)
-    harvest_days = _avg_days(days_to_harvest_min, days_to_harvest_max, default=60)
 
     # Phase boundaries — anchored to the seed date when known, so a transplant
     # that already germinated in the tray doesn't show "germination" again
     seed_anchor = seed_start_date or start_date
     germ_end_date = seed_anchor + timedelta(days=germ_days)
-    harvest_start_date = seed_anchor + timedelta(days=harvest_days)
+    harvest_start_date = compute_harvest_start(
+        start_date, days_to_harvest_min, days_to_harvest_max, seed_start_date
+    )
 
     if as_of < germ_end_date:
         # Germination phase
@@ -153,6 +154,20 @@ def compute_lifecycle_phase(
             phase_total_days=max(phase_total, 1),
             progress_percent=progress_percent,
         )
+
+
+def compute_harvest_start(
+    start_date: date,
+    days_to_harvest_min: int | None,
+    days_to_harvest_max: int | None,
+    seed_start_date: date | None = None,
+) -> date:
+    """Expected first-harvest date: seed anchor + average days_to_harvest.
+
+    Shared with the harvest forecast so both agree on when a planting starts producing.
+    """
+    harvest_days = _avg_days(days_to_harvest_min, days_to_harvest_max, default=60)
+    return (seed_start_date or start_date) + timedelta(days=harvest_days)
 
 
 def _avg_days(min_val: int | None, max_val: int | None, default: int) -> int:

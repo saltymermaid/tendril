@@ -25,6 +25,7 @@ from app.models.planting import Planting
 from app.models.task import Task
 from app.models.variety import Variety
 from app.models.yard import Yard, YardObject
+from app.services.harvest_forecast import get_harvest_forecast as _get_harvest_forecast
 from app.services.lifecycle import compute_lifecycle_phase
 from app.services.recommendations import get_recommendations as _get_recommendations
 
@@ -60,6 +61,13 @@ def _variety_dict(v: Variety) -> dict:
         "sunlight": v.sunlight,
         "is_climbing": v.is_climbing,
         "planting_method": v.planting_method,
+        "harvest_type_override": v.harvest_type_override,
+        "harvest_type": v.effective_harvest_type if v.category else v.harvest_type_override,
+        # Own overrides (null = inherits the category's); effective_* is what the forecast uses
+        "harvest_unit": v.harvest_unit,
+        "plants_per_square": v.plants_per_square,
+        "effective_harvest_unit": v.effective_harvest_unit if v.category else v.harvest_unit,
+        "effective_plants_per_square": v.effective_plants_per_square if v.category else v.plants_per_square,
         "notes": v.notes,
     }
 
@@ -88,6 +96,8 @@ def _category_dict(c: Category) -> dict:
         "name": c.name,
         "color": c.color,
         "harvest_type": c.harvest_type,
+        "harvest_unit": c.harvest_unit,
+        "plants_per_square": c.plants_per_square,
         "icon_svg": c.icon_svg,
         "planting_seasons": [
             {
@@ -148,6 +158,8 @@ async def list_categories() -> list[dict]:
                 Category.name,
                 Category.color,
                 Category.harvest_type,
+                Category.harvest_unit,
+                Category.plants_per_square,
                 Category.icon_svg.isnot(None).label("has_icon"),
                 func.coalesce(variety_count_sq.c.variety_count, 0).label("variety_count"),
             )
@@ -161,6 +173,8 @@ async def list_categories() -> list[dict]:
                 "name": row.name,
                 "color": row.color,
                 "harvest_type": row.harvest_type,
+                "harvest_unit": row.harvest_unit,
+                "plants_per_square": row.plants_per_square,
                 "has_icon": row.has_icon,
                 "variety_count": row.variety_count,
             }
@@ -520,3 +534,21 @@ async def get_recommendations(
                 for r in results
             ],
         }
+
+
+@mcp_server.tool()
+async def get_harvest_forecast(start: date | None = None, weeks: int = 4) -> dict:
+    """Week-by-week forecast of what's expected to be harvested (Monday–Sunday weeks,
+    starting with the week containing `start`, default today; up to 52 weeks) — for
+    planning cooking, canning, and preserving. Each week lists items grouped by variety
+    with a ready-to-read `label`, e.g. "Snowball Cauliflower: 2 heads" (single harvest —
+    lands in the week of the planting's end_date) or "Sweet Banana Pepper: continuous"
+    (producing every week from harvest start through end_date; `starting`/`ending` flag
+    the first and last week). Counts come from planting.quantity, falling back to
+    plants_per_square (the variety's, else its category's); `overdue` marks in-progress plantings still in the ground
+    past their end_date (listed in the first week only). Varieties/categories with harvest_type 'none' are left out."""
+    if not 1 <= weeks <= 52:
+        raise ToolError("weeks must be between 1 and 52")
+    async with async_session() as db:
+        user = await get_mcp_user(db)
+        return {"weeks": await _get_harvest_forecast(db, user.id, start or date.today(), weeks)}

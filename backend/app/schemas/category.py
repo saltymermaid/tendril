@@ -1,6 +1,10 @@
 """Category, PlantingSeason, and CompanionRule Pydantic schemas."""
 
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+HarvestType = Literal["single", "continuous", "none"]
 
 
 # --- Planting Season ---
@@ -39,7 +43,9 @@ class CompanionRuleResponse(BaseModel):
 class CategoryBase(BaseModel):
     name: str
     color: str
-    harvest_type: str = "continuous"
+    harvest_type: HarvestType = "continuous"
+    harvest_unit: str | None = None
+    plants_per_square: int | None = Field(default=None, ge=1)
     icon_svg: str | None = None
 
 
@@ -50,7 +56,9 @@ class CategoryCreate(CategoryBase):
 class CategoryUpdate(BaseModel):
     name: str | None = None
     color: str | None = None
-    harvest_type: str | None = None
+    harvest_type: HarvestType | None = None
+    harvest_unit: str | None = None  # "" clears it
+    plants_per_square: int | None = Field(default=None, ge=1)
     icon_svg: str | None = None
     planting_seasons: list[PlantingSeasonCreate] | None = None
 
@@ -60,6 +68,8 @@ class CategoryListResponse(BaseModel):
     name: str
     color: str
     harvest_type: str
+    harvest_unit: str | None = None
+    plants_per_square: int | None = None
     icon_svg: str | None = None
     variety_count: int = 0
 
@@ -71,6 +81,8 @@ class CategoryDetailResponse(BaseModel):
     name: str
     color: str
     harvest_type: str
+    harvest_unit: str | None = None
+    plants_per_square: int | None = None
     icon_svg: str | None = None
     planting_seasons: list[PlantingSeasonResponse] = []
     companion_rules: list[CompanionRuleResponse] = []

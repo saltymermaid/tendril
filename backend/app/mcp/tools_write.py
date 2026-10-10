@@ -51,11 +51,30 @@ from app.services.localtime import to_utc
 
 VALID_REMOVAL_REASONS = {"harvest_complete", "died", "pulled_early", "pest_disease", "other"}
 VALID_PLANTING_METHODS = {"direct_sow", "transplant", "both"}
-VALID_HARVEST_TYPES = {"single", "continuous"}
+VALID_HARVEST_TYPES = {"single", "continuous", "none"}
 VALID_TASK_STATUSES = {"pending", "completed", "dismissed"}
 # Same options the container form offers (frontend/src/pages/ContainerFormPage.tsx).
 VALID_IRRIGATION_TYPES = {"drip", "manual", "sprinkler"}
 VALID_IRRIGATION_FREQUENCIES = {"daily", "2x_daily", "every_2_days", "every_3_days", "weekly"}
+
+
+def _validate_harvest_fields(
+    harvest_type_override: str | None, plants_per_square: int | None, allow_clear: bool = False
+) -> None:
+    """allow_clear: update tools accept plants_per_square=0 as "clear it"."""
+    if harvest_type_override is not None and harvest_type_override not in VALID_HARVEST_TYPES:
+        raise ToolError(f"harvest_type_override must be one of: {', '.join(sorted(VALID_HARVEST_TYPES))}")
+    if plants_per_square is not None and plants_per_square < (0 if allow_clear else 1):
+        raise ToolError("plants_per_square must be at least 1")
+
+
+def _apply_harvest_count_fields(obj, harvest_unit: str | None, plants_per_square: int | None) -> None:
+    """Set harvest_unit / plants_per_square on a Variety or Category for an update tool:
+    None leaves the field alone, "" / 0 clears it."""
+    if harvest_unit is not None:
+        obj.harvest_unit = harvest_unit.strip() or None
+    if plants_per_square is not None:
+        obj.plants_per_square = plants_per_square or None
 
 
 def _planting_season_from_dict(category_id: int, ps: dict) -> PlantingSeason:
@@ -89,12 +108,24 @@ async def create_variety(
     sunlight: str | None = None,
     is_climbing: bool = False,
     planting_method: str = "both",
+    harvest_type_override: str | None = None,
+    harvest_unit: str | None = None,
+    plants_per_square: int | None = None,
     source_url: str | None = None,
     notes: str | None = None,
 ) -> dict:
     """Add a new plant variety to the catalog under an existing category (see
     list_categories for category_id). days_to_harvest is measured from seed, not from
-    transplant. planting_method must be one of: direct_sow, transplant, both."""
+    transplant. planting_method must be one of: direct_sow, transplant, both.
+
+    Harvest forecast fields all override the category's value for just this variety, and are
+    best left unset so it inherits the category's (see list_categories): harvest_type_override
+    (single/continuous/none) — e.g. head lettuce 'single' under a 'continuous' Lettuce category,
+    or a marigold 'none' so it's left out of the forecast. harvest_unit is a singular noun for one
+    plant's harvest (head, bunch, root). plants_per_square is how many plants fill one planting's
+    footprint (16 radishes in a 1x1, 1 tomato in a 2x2) — set it only when this variety differs
+    from its category (e.g. pole beans at 8 when Beans is 9)."""
+    _validate_harvest_fields(harvest_type_override, plants_per_square)
     if planting_method not in VALID_PLANTING_METHODS:
         raise ToolError(f"planting_method must be one of: {', '.join(sorted(VALID_PLANTING_METHODS))}")
 
@@ -119,6 +150,9 @@ async def create_variety(
             sunlight=sunlight,
             is_climbing=is_climbing,
             planting_method=planting_method,
+            harvest_type_override=harvest_type_override,
+            harvest_unit=harvest_unit,
+            plants_per_square=plants_per_square,
             source_url=source_url,
             notes=notes,
         )
@@ -147,13 +181,23 @@ async def update_variety(
     sunlight: str | None = None,
     is_climbing: bool | None = None,
     planting_method: str | None = None,
+    harvest_type_override: str | None = None,
+    harvest_unit: str | None = None,
+    plants_per_square: int | None = None,
     source_url: str | None = None,
     notes: str | None = None,
 ) -> dict:
     """Update a variety's fields — only the ones you pass are changed. planting_method,
-    if given, must be one of: direct_sow, transplant, both. Note: passing a field with
-    value None leaves it unchanged rather than clearing it (no way to blank out an
-    already-set field through this tool)."""
+    if given, must be one of: direct_sow, transplant, both.
+
+    The harvest fields override the category's values; to go back to inheriting the category's,
+    pass harvest_type_override='category', harvest_unit='', or plants_per_square=0. Prefer
+    setting a default on the category (update_category) over setting the same value on each of
+    its varieties. Note: other fields passed as None are left unchanged rather than cleared."""
+    clear_harvest_override = harvest_type_override == "category"
+    if clear_harvest_override:
+        harvest_type_override = None
+    _validate_harvest_fields(harvest_type_override, plants_per_square, allow_clear=True)
     if planting_method is not None and planting_method not in VALID_PLANTING_METHODS:
         raise ToolError(f"planting_method must be one of: {', '.join(sorted(VALID_PLANTING_METHODS))}")
 
@@ -183,12 +227,16 @@ async def update_variety(
             "sunlight": sunlight,
             "is_climbing": is_climbing,
             "planting_method": planting_method,
+            "harvest_type_override": harvest_type_override,
             "source_url": source_url,
             "notes": notes,
         }
         for field, value in updates.items():
             if value is not None:
                 setattr(variety, field, value)
+        if clear_harvest_override:
+            variety.harvest_type_override = None
+        _apply_harvest_count_fields(variety, harvest_unit, plants_per_square)
 
         await db.commit()
 
@@ -740,17 +788,24 @@ async def create_category(
     name: str,
     color: str,
     harvest_type: str = "continuous",
+    harvest_unit: str | None = None,
+    plants_per_square: int | None = None,
     icon_svg: str | None = None,
     planting_seasons: list[dict] | None = None,
 ) -> dict:
     """Add a new plant category to the catalog (global — shared across every user of this
     Tendril instance, like Tomatoes or Peppers). color is a hex string like '#FF5733'.
-    harvest_type must be 'single' (one harvest ends the planting, e.g. a head of lettuce)
-    or 'continuous' (repeated harvests over time, e.g. tomatoes). Each planting_seasons
-    entry needs usda_zone, start_month, start_day, end_month, end_day — this garden is
-    Zone 10a."""
+    harvest_type must be 'single' (one harvest ends the planting, e.g. a head of lettuce),
+    'continuous' (repeated harvests over time, e.g. tomatoes), or 'none' (not harvested
+    for food, e.g. ornamental flowers — left out of the harvest forecast). harvest_unit (a
+    singular noun for one plant's harvest: head, bunch, root) and plants_per_square (plants in
+    one planting's footprint, square-foot-gardening style: 16 carrots, 1 broccoli) are the
+    harvest forecast defaults every variety in the category inherits; the unit mostly matters
+    for single-harvest crops. Each planting_seasons entry needs usda_zone, start_month,
+    start_day, end_month, end_day — this garden is Zone 10a."""
     if harvest_type not in VALID_HARVEST_TYPES:
         raise ToolError(f"harvest_type must be one of: {', '.join(sorted(VALID_HARVEST_TYPES))}")
+    _validate_harvest_fields(None, plants_per_square)
 
     async with async_session() as db:
         await get_mcp_user(db)
@@ -759,7 +814,14 @@ async def create_category(
         if existing.scalar_one_or_none():
             raise ToolError(f"Category '{name}' already exists")
 
-        category = Category(name=name, color=color, harvest_type=harvest_type, icon_svg=icon_svg)
+        category = Category(
+            name=name,
+            color=color,
+            harvest_type=harvest_type,
+            harvest_unit=(harvest_unit or "").strip() or None,
+            plants_per_square=plants_per_square,
+            icon_svg=icon_svg,
+        )
         db.add(category)
         await db.flush()
 
@@ -778,14 +840,19 @@ async def update_category(
     name: str | None = None,
     color: str | None = None,
     harvest_type: str | None = None,
+    harvest_unit: str | None = None,
+    plants_per_square: int | None = None,
     icon_svg: str | None = None,
     planting_seasons: list[dict] | None = None,
 ) -> dict:
     """Update a category's fields — only the ones you pass are changed. Passing
     planting_seasons replaces the category's entire season list (each entry needs
-    usda_zone, start_month, start_day, end_month, end_day)."""
+    usda_zone, start_month, start_day, end_month, end_day). harvest_unit and
+    plants_per_square are the harvest forecast defaults its varieties inherit (see
+    create_category); pass harvest_unit='' or plants_per_square=0 to clear one."""
     if harvest_type is not None and harvest_type not in VALID_HARVEST_TYPES:
         raise ToolError(f"harvest_type must be one of: {', '.join(sorted(VALID_HARVEST_TYPES))}")
+    _validate_harvest_fields(None, plants_per_square, allow_clear=True)
 
     async with async_session() as db:
         await get_mcp_user(db)
@@ -806,6 +873,7 @@ async def update_category(
             category.color = color
         if harvest_type is not None:
             category.harvest_type = harvest_type
+        _apply_harvest_count_fields(category, harvest_unit, plants_per_square)
         if icon_svg is not None:
             category.icon_svg = icon_svg
 

@@ -128,6 +128,8 @@ COMPANION_RULES = [
 # (category, name, germ_min, germ_max, harvest_min, harvest_max, spacing,
 #  is_climbing, planting_method, depth, sunlight, notes, seed_start_days)
 # seed_start_days: days to grow in outdoor tray before transplanting (None = direct sow only)
+# Harvest forecast fields (unit, plants per square, harvest type override) live in
+# CATEGORY_HARVEST_DEFAULTS / VARIETY_HARVEST_OVERRIDES below.
 # Use the larger end of typical ranges to maximize transplant readiness.
 VARIETIES = [
     # Tomatoes — 6-8 weeks in tray
@@ -212,6 +214,67 @@ VARIETIES = [
 ]
 
 
+# ─── Harvest forecast data ────────────────────────────────────────────────────
+# Kept apart from the VARIETIES tuples so they don't grow three more columns.
+# Category defaults: (harvest_unit, plants_per_square), stored on the category and inherited
+# by its varieties. harvest_unit is a singular noun and mostly matters for single-harvest crops
+# ("2 heads"); continuous crops just read "continuous". plants_per_square = plants in one
+# planting's footprint, so 1 for anything 2x2. Entries for categories not in CATEGORIES are
+# skipped by the seed (they're here so the values live in one place).
+CATEGORY_HARVEST_DEFAULTS = {
+    "Tomatoes":        (None,     1),
+    "Peppers":         (None,     1),
+    "Cucumbers":       (None,     1),
+    "Squash":          (None,     1),
+    "Beans":           (None,     9),
+    "Sweet Potatoes":  ("plant",  1),
+    "Bunching Onions": ("onion", 16),
+    "Peas":            (None,     8),
+    "Cabbage":         ("head",   1),
+    "Melons":          ("plant",  1),
+    "Radishes":        ("radish", 16),
+    "Herbs":           (None,     1),
+    "Flowers":         (None,     1),
+    "Okra":            (None,     1),
+    "Eggplant":        (None,     1),
+    "Beets":           ("beet",   9),
+    "Broccoli":        ("head",   1),
+    "Carrots":         ("carrot", 16),
+    "Cauliflower":     ("head",   1),
+    "Corn":            ("plant",  4),
+    "Kohlrabi":        ("bulb",   4),
+    "Onions":          ("onion",  9),
+    "Peanuts":         ("plant",  1),
+    "Sunflowers":      ("head",   1),
+}
+
+# Per-variety exceptions: variety name -> dict of harvest_type_override / harvest_unit /
+# plants_per_square, stored on the variety as overrides of the category's values.
+VARIETY_HARVEST_OVERRIDES = {
+    "Double Yield Pickling":          {"plants_per_square": 2},
+    "Pole Blue Lake":                 {"plants_per_square": 8},
+    "PR Black Bean (vining)":         {"plants_per_square": 8},
+    "Dwarf Pak Choi":                 {"plants_per_square": 4},
+    "Watermelon Radish":              {"plants_per_square": 9},
+    "English Thyme":                  {"plants_per_square": 4},
+    "French Thyme":                   {"plants_per_square": 4},
+    "Slow-Bolt Cilantro":             {"plants_per_square": 9},
+    "Italian Large Leaf Basil":       {"plants_per_square": 4},
+    "Green Basil":                    {"plants_per_square": 4},
+    "Purple Basil":                   {"plants_per_square": 4},
+    "Common Chives":                  {"plants_per_square": 16},
+    "Chives":                         {"plants_per_square": 16},
+    "Parsley":                        {"plants_per_square": 4},
+    # Ornamental-only flowers stay out of the harvest forecast
+    "Queen Sophia Marigold":          {"harvest_type_override": "none", "plants_per_square": 4},
+    "Naughty Marietta Marigold":      {"harvest_type_override": "none", "plants_per_square": 4},
+    "French Red Cherry Marigold":     {"harvest_type_override": "none", "plants_per_square": 4},
+    "Marigold (French Double Dwarf)": {"harvest_type_override": "none", "plants_per_square": 4},
+    "Marigold":                       {"harvest_type_override": "none", "plants_per_square": 4},
+    "Zinnia (Pinwheel Mixed Colors)": {"harvest_type_override": "none", "plants_per_square": 4},
+}
+
+
 async def seed_reference(session, email: str, name: str = "Dev User"):
     """Seed all shared reference data and return (user, cat_map, var_map).
 
@@ -241,7 +304,8 @@ async def seed_reference(session, email: str, name: str = "Dev User"):
     # ── 2. Create categories ──────────────────────────────────────────────────
     cat_map: dict[str, Category] = {}
     for cat_data in CATEGORIES:
-        cat = Category(**cat_data)
+        unit, pps = CATEGORY_HARVEST_DEFAULTS.get(cat_data["name"], (None, None))
+        cat = Category(**cat_data, harvest_unit=unit, plants_per_square=pps)
         session.add(cat)
         await session.flush()
         cat_map[cat.name] = cat
@@ -281,6 +345,7 @@ async def seed_reference(session, email: str, name: str = "Dev User"):
             seed_start_days=ssd,
             spacing=spacing, is_climbing=climbing, planting_method=method,
             planting_depth=depth, sunlight=sun, notes=notes,
+            **VARIETY_HARVEST_OVERRIDES.get(vname, {}),
         )
         session.add(variety)
         await session.flush()

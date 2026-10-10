@@ -14,6 +14,8 @@ interface CategoryFormData {
   name: string
   color: string
   harvest_type: string
+  harvest_unit: string
+  plants_per_square: number | ''
   icon_svg: string
   planting_seasons: PlantingSeasonInput[]
 }
@@ -57,6 +59,8 @@ export function CategoryFormPage() {
     name: '',
     color: '#22c55e',
     harvest_type: 'continuous',
+    harvest_unit: '',
+    plants_per_square: '',
     icon_svg: '',
     planting_seasons: [{ ...EMPTY_SEASON }],
   })
@@ -79,6 +83,8 @@ export function CategoryFormPage() {
         name: data.name,
         color: data.color,
         harvest_type: data.harvest_type,
+        harvest_unit: data.harvest_unit || '',
+        plants_per_square: data.plants_per_square ?? '',
         icon_svg: data.icon_svg || '',
         planting_seasons: data.planting_seasons.length > 0
           ? data.planting_seasons.map((ps: PlantingSeasonInput) => ({
@@ -107,6 +113,8 @@ export function CategoryFormPage() {
         name: form.name,
         color: form.color,
         harvest_type: form.harvest_type,
+        harvest_unit: form.harvest_unit.trim() || null,
+        plants_per_square: form.plants_per_square || null,
         icon_svg: form.icon_svg || null,
         planting_seasons: form.planting_seasons,
       }
@@ -220,9 +228,40 @@ export function CategoryFormPage() {
               >
                 <option value="continuous">Continuous</option>
                 <option value="single">Single</option>
+                <option value="none">None (not harvested for food)</option>
               </select>
             </div>
           </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Harvest Unit</label>
+              <input
+                type="text"
+                className="input"
+                value={form.harvest_unit}
+                onChange={(e) => setForm({ ...form, harvest_unit: e.target.value })}
+                placeholder="e.g., head, bunch, root"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Plants per Square</label>
+              <input
+                type="number"
+                className="input"
+                min={1}
+                value={form.plants_per_square}
+                onChange={(e) =>
+                  setForm({ ...form, plants_per_square: e.target.value ? parseInt(e.target.value) : '' })
+                }
+                placeholder="e.g., 16 for radishes"
+              />
+            </div>
+          </div>
+          <p className="form-help" style={{ marginTop: 'calc(-1 * var(--space-2))', marginBottom: 'var(--space-4)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            Harvest forecast defaults for every variety in this category (a variety can override them).
+            The unit mostly matters for single-harvest crops, e.g. "4 heads".
+          </p>
 
           <div className="form-group">
             <label className="form-label">Icon SVG (optional)</label>

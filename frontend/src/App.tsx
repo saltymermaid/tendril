@@ -21,6 +21,7 @@ import { PlantingDetailPage } from '@/pages/PlantingDetailPage'
 import { GardenOverviewPage } from '@/pages/GardenOverviewPage'
 import { TimelinePage } from '@/pages/TimelinePage'
 import { TasksPage } from '@/pages/TasksPage'
+import { HarvestPage } from '@/pages/HarvestPage'
 
 function App() {
   return (
@@ -57,6 +58,7 @@ function App() {
             <Route path="/yards/:id/edit" element={<YardFormPage />} />
             <Route path="/plantings/:id" element={<PlantingDetailPage />} />
             <Route path="/tasks" element={<TasksPage />} />
+            <Route path="/harvest" element={<HarvestPage />} />
           </Route>
         </Routes>
       </AuthProvider>

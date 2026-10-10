@@ -6,6 +6,9 @@ interface Category {
   id: number
   name: string
   color: string
+  harvest_type: string
+  harvest_unit: string | null
+  plants_per_square: number | null
 }
 
 interface VarietyFormData {
@@ -25,6 +28,9 @@ interface VarietyFormData {
   sunlight: string
   is_climbing: boolean
   planting_method: string
+  harvest_type_override: string
+  harvest_unit: string
+  plants_per_square: number | ''
   seed_packet_photo_url: string
   source_url: string
   notes: string
@@ -47,6 +53,9 @@ const EMPTY_FORM: VarietyFormData = {
   sunlight: 'full_sun',
   is_climbing: false,
   planting_method: 'both',
+  harvest_type_override: '',
+  harvest_unit: '',
+  plants_per_square: '',
   seed_packet_photo_url: '',
   source_url: '',
   notes: '',
@@ -174,6 +183,9 @@ export function VarietyFormPage() {
           sunlight: data.sunlight || 'full_sun',
           is_climbing: data.is_climbing,
           planting_method: data.planting_method,
+          harvest_type_override: data.harvest_type_override || '',
+          harvest_unit: data.harvest_unit || '',
+          plants_per_square: data.plants_per_square ?? '',
           seed_packet_photo_url: data.seed_packet_photo_url || '',
           source_url: data.source_url || '',
           notes: data.notes || '',
@@ -273,6 +285,9 @@ export function VarietyFormPage() {
         sunlight: form.sunlight || null,
         is_climbing: form.is_climbing,
         planting_method: form.planting_method,
+        harvest_type_override: form.harvest_type_override || null,
+        harvest_unit: form.harvest_unit.trim() || null,
+        plants_per_square: form.plants_per_square || null,
         planting_depth: form.planting_depth || null,
         seed_packet_photo_url: form.seed_packet_photo_url || null,
         source_url: form.source_url || null,
@@ -314,6 +329,8 @@ export function VarietyFormPage() {
   function updateField(field: keyof VarietyFormData, value: string | number | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
+
+  const selectedCategory = categories.find((c) => c.id === form.category_id)
 
   if (loading) {
     return (
@@ -597,6 +614,66 @@ export function VarietyFormPage() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Harvest */}
+        <div className="form-card">
+          <h3>Harvest</h3>
+          <p className="form-help" style={{ marginBottom: 'var(--space-4)' }}>
+            Used by the weekly harvest forecast, e.g. "2 heads" or "continuous".
+          </p>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Harvest Type</label>
+              <select
+                className="input"
+                value={form.harvest_type_override}
+                onChange={(e) => updateField('harvest_type_override', e.target.value)}
+              >
+                <option value="">
+                  Same as category{selectedCategory ? ` (${selectedCategory.harvest_type})` : ''}
+                </option>
+                <option value="single">Single (one harvest, then pulled)</option>
+                <option value="continuous">Continuous (keeps producing)</option>
+                <option value="none">None (not harvested for food)</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Harvest Unit</label>
+              <input
+                type="text"
+                className="input"
+                value={form.harvest_unit}
+                onChange={(e) => updateField('harvest_unit', e.target.value)}
+                placeholder={
+                  selectedCategory?.harvest_unit
+                    ? `Same as category (${selectedCategory.harvest_unit})`
+                    : 'e.g., head, bunch, root'
+                }
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Plants per Square</label>
+              <input
+                type="number"
+                className="input"
+                value={form.plants_per_square}
+                onChange={(e) => updateField('plants_per_square', e.target.value ? parseInt(e.target.value) : '')}
+                min={1}
+                placeholder={
+                  selectedCategory?.plants_per_square
+                    ? `Same as category (${selectedCategory.plants_per_square})`
+                    : 'e.g., 16 for radishes'
+                }
+              />
+              <p className="form-help" style={{ marginTop: 'var(--space-1)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Plants in one planting's footprint (1 for a 2×2 tomato). Used when a planting has no quantity.
+                Leave blank to use the category's.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Season Override */}

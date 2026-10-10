@@ -1,6 +1,8 @@
 """Variety Pydantic schemas."""
 
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, Field
 
 
 class VarietyBase(BaseModel):
@@ -20,6 +22,9 @@ class VarietyBase(BaseModel):
     sunlight: str | None = None
     is_climbing: bool = False
     planting_method: str = "both"
+    harvest_type_override: Literal["single", "continuous", "none"] | None = None
+    harvest_unit: str | None = None
+    plants_per_square: int | None = Field(default=None, ge=1)
     seed_packet_photo_url: str | None = None
     source_url: str | None = None
     notes: str | None = None
@@ -46,6 +51,9 @@ class VarietyUpdate(BaseModel):
     sunlight: str | None = None
     is_climbing: bool | None = None
     planting_method: str | None = None
+    harvest_type_override: Literal["single", "continuous", "none"] | None = None
+    harvest_unit: str | None = None
+    plants_per_square: int | None = Field(default=None, ge=1)
     seed_packet_photo_url: str | None = None
     source_url: str | None = None
     notes: str | None = None
@@ -56,5 +64,8 @@ class VarietyResponse(VarietyBase):
     user_id: int
     category_name: str | None = None
     category_color: str | None = None
+    category_harvest_type: str | None = None
+    category_harvest_unit: str | None = None
+    category_plants_per_square: int | None = None
 
     model_config = {"from_attributes": True}

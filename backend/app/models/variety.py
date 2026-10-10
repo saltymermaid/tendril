@@ -40,6 +40,15 @@ class Variety(Base):
         String(20), nullable=False, default="both"
     )  # direct_sow, transplant, both
 
+    # Harvest forecast — all three override the category's value when set; null inherits it
+    harvest_type_override: Mapped[str | None] = mapped_column(
+        String(20), nullable=True
+    )  # single, continuous, none — overrides category.harvest_type when set
+    harvest_unit: Mapped[str | None] = mapped_column(String(30), nullable=True)  # Overrides category.harvest_unit
+    plants_per_square: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )  # Overrides category.plants_per_square — fallback when planting.quantity is unset
+
     # Media & links
     seed_packet_photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
@@ -60,6 +69,21 @@ class Variety(Base):
     category: Mapped["Category"] = relationship(back_populates="varieties")  # noqa: F821
     plantings: Mapped[list["Planting"]] = relationship(back_populates="variety")  # noqa: F821
     plant_starts: Mapped[list["PlantStart"]] = relationship(back_populates="variety")  # noqa: F821
+
+    @property
+    def effective_harvest_type(self) -> str:
+        """Variety override if set, else the category's harvest_type. Requires category loaded."""
+        return self.harvest_type_override or self.category.harvest_type
+
+    @property
+    def effective_harvest_unit(self) -> str | None:
+        """Variety's harvest_unit if set, else the category's. Requires category loaded."""
+        return self.harvest_unit or self.category.harvest_unit
+
+    @property
+    def effective_plants_per_square(self) -> int | None:
+        """Variety's plants_per_square if set, else the category's. Requires category loaded."""
+        return self.plants_per_square or self.category.plants_per_square
 
     def __repr__(self) -> str:
         return f"<Variety(id={self.id}, name='{self.name}', category_id={self.category_id})>"

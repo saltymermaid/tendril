@@ -4725,3 +4725,84 @@ select.form-input {
     border: 1px solid #ccc;
   }
 }
+
+/* ─── Harvest Forecast ─────────────────────────────────────────────────────── */
+.harvest-weeks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.harvest-week-range {
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+
+.harvest-empty {
+  font-size: 0.9rem;
+}
+
+.harvest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.harvest-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.harvest-item + .harvest-item {
+  border-top: 1px solid var(--color-border);
+}
+
+.harvest-dot {
+  flex-shrink: 0;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: var(--radius-full);
+}
+
+.harvest-item-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.harvest-label {
+  color: var(--color-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.harvest-label:hover {
+  text-decoration: underline;
+}
+
+.harvest-continuous .harvest-label {
+  font-weight: 400;
+}
+
+.harvest-meta {
+  font-size: 0.8rem;
+}
+
+.harvest-badge {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+.harvest-badge-overdue {
+  background: color-mix(in srgb, var(--color-error) 15%, transparent);
+  color: var(--color-error);
+}

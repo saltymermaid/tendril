@@ -16,6 +16,7 @@ from app.routers.auth import router as auth_router
 from app.routers.categories import router as categories_router
 from app.routers.containers import router as containers_router
 from app.routers.events import router as events_router
+from app.routers.harvest import router as harvest_router
 from app.routers.mcp_auth import router as mcp_auth_router
 from app.routers.mcp_wellknown import router as mcp_wellknown_router
 from app.routers.notes import router as notes_router
@@ -78,6 +79,7 @@ app.include_router(auth_router)
 app.include_router(categories_router)
 app.include_router(containers_router)
 app.include_router(events_router)
+app.include_router(harvest_router)
 app.include_router(notes_router)
 app.include_router(plant_starts_router)
 app.include_router(plantings_router)

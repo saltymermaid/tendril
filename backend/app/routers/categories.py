@@ -42,6 +42,8 @@ async def list_categories(
             Category.name,
             Category.color,
             Category.harvest_type,
+            Category.harvest_unit,
+            Category.plants_per_square,
             Category.icon_svg,
             func.coalesce(variety_count_sq.c.variety_count, 0).label("variety_count"),
         )
@@ -58,6 +60,8 @@ async def list_categories(
             name=row.name,
             color=row.color,
             harvest_type=row.harvest_type,
+            harvest_unit=row.harvest_unit,
+            plants_per_square=row.plants_per_square,
             icon_svg=row.icon_svg,
             variety_count=row.variety_count,
         )
@@ -123,6 +127,8 @@ async def get_category(
         name=category.name,
         color=category.color,
         harvest_type=category.harvest_type,
+        harvest_unit=category.harvest_unit,
+        plants_per_square=category.plants_per_square,
         icon_svg=category.icon_svg,
         planting_seasons=planting_seasons,
         companion_rules=companion_rules,
@@ -148,6 +154,8 @@ async def create_category(
         name=data.name,
         color=data.color,
         harvest_type=data.harvest_type,
+        harvest_unit=data.harvest_unit or None,
+        plants_per_square=data.plants_per_square,
         icon_svg=data.icon_svg,
     )
     db.add(category)
@@ -210,6 +218,11 @@ async def update_category(
         category.color = data.color
     if data.harvest_type is not None:
         category.harvest_type = data.harvest_type
+    # Unlike the fields above, an explicit null clears these (back to "1 planting" counts)
+    if "harvest_unit" in data.model_fields_set:
+        category.harvest_unit = data.harvest_unit or None
+    if "plants_per_square" in data.model_fields_set:
+        category.plants_per_square = data.plants_per_square
     if data.icon_svg is not None:
         category.icon_svg = data.icon_svg
 

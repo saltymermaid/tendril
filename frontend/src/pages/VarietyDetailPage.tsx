@@ -9,6 +9,9 @@ interface VarietyDetail {
   category_id: number
   category_name: string | null
   category_color: string | null
+  category_harvest_type: string | null
+  category_harvest_unit: string | null
+  category_plants_per_square: number | null
   season_override_start_month: number | null
   season_override_start_day: number | null
   season_override_end_month: number | null
@@ -23,6 +26,9 @@ interface VarietyDetail {
   sunlight: string | null
   is_climbing: boolean
   planting_method: string
+  harvest_type_override: string | null
+  harvest_unit: string | null
+  plants_per_square: number | null
   seed_packet_photo_url: string | null
   source_url: string | null
   notes: string | null
@@ -280,6 +286,33 @@ export function VarietyDetailPage() {
                 <dd>{variety.seed_start_days} days before transplanting</dd>
               </div>
             )}
+            <div className="detail-item">
+              <dt>Harvest Type</dt>
+              <dd>
+                {variety.harvest_type_override ?? variety.category_harvest_type ?? '—'}
+                {!variety.harvest_type_override && variety.category_harvest_type && (
+                  <span className="text-muted"> (from category)</span>
+                )}
+              </dd>
+            </div>
+            <div className="detail-item">
+              <dt>Harvest Unit</dt>
+              <dd>
+                {variety.harvest_unit || variety.category_harvest_unit || '—'}
+                {!variety.harvest_unit && variety.category_harvest_unit && (
+                  <span className="text-muted"> (from category)</span>
+                )}
+              </dd>
+            </div>
+            <div className="detail-item">
+              <dt>Plants per Square</dt>
+              <dd>
+                {variety.plants_per_square ?? variety.category_plants_per_square ?? '—'}
+                {variety.plants_per_square == null && variety.category_plants_per_square != null && (
+                  <span className="text-muted"> (from category)</span>
+                )}
+              </dd>
+            </div>
           </dl>
         </div>
 
