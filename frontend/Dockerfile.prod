@@ -29,9 +29,10 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Add security headers config
 RUN echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Tendril</title></head><body><h1>Tendril</h1></body></html>' > /usr/share/nginx/html/50x.html
 
-# Health check
+# Health check (127.0.0.1, not localhost: localhost resolves to ::1 here and
+# nginx only listens on IPv4, so busybox wget gets "connection refused")
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD wget -q --spider http://localhost:80/health || exit 1
+    CMD wget -q --spider http://127.0.0.1:80/health || exit 1
 
 EXPOSE 80
 
