@@ -1,8 +1,9 @@
 """Narrow write MCP tools — create/update varieties and categories, create/edit/delete a
-planting, complete a planting, create/edit a task, change a task's status, create/edit/delete a
+planting, mark a planting as planted (activate), complete a planting, create/edit a task, change a task's status, create/edit/delete a
 plant start, edit a container's name/location/irrigation. update_planting and delete_planting are
 both restricted to not_started plantings — editing or removing something already in the ground
-stays REST/UI-only (see complete_planting for recording an actual removal). No yard mutations, and
+stays REST/UI-only (see activate_planting for recording that it went in, and complete_planting
+for recording an actual removal). No yard mutations, and
 no container resize/create/delete, by design (see the plan's confirmed v1 write scope) — variety,
 category, plant-start, and container-detail writes were added on top of that scope so the garden
 can be maintained from an MCP client.
@@ -49,6 +50,7 @@ from app.mcp.tools_read import (
 )
 from app.routers.plantings import (
     _check_overlap,
+    activate_planting_in_place,
     _consume_plant_start,
     _rebalance_plant_start,
     validate_planting_bounds,
@@ -362,6 +364,39 @@ async def create_planting(
 
 
 @mcp_server.tool()
+async def activate_planting(
+    planting_id: int,
+    actual_start_date: date | None = None,
+) -> dict:
+    """Mark a planned planting as planted — transition it from not_started to in_progress and
+    log a planting event. Use this when the user says they've sown/transplanted something that
+    was already in the plan. actual_start_date is the day it actually went into the square
+    (defaults to today); if it differs from the planned start_date, start_date moves to it and
+    the squares are re-checked for overlap. end_date is left unchanged."""
+    async with async_session() as db:
+        user = await get_mcp_user(db)
+
+        result = await db.execute(select(Planting).where(Planting.id == planting_id, Planting.user_id == user.id))
+        planting = result.scalar_one_or_none()
+        if not planting:
+            raise ToolError(f"Planting {planting_id} not found")
+
+        try:
+            await activate_planting_in_place(db, planting, actual_start_date)
+        except HTTPException as exc:
+            raise ToolError(exc.detail) from exc
+        await db.commit()
+
+        result = await db.execute(
+            select(Planting)
+            .options(selectinload(Planting.variety), selectinload(Planting.container))
+            .where(Planting.id == planting.id)
+        )
+        loaded = result.scalar_one()
+        return _planting_dict(loaded)
+
+
+@mcp_server.tool()
 async def complete_planting(
     planting_id: int,
     removal_reason: str,
@@ -417,8 +452,9 @@ async def update_planting(
 ) -> dict:
     """Edit a planned (not_started) planting — move it to a different square, swap its
     variety, or adjust its dates/method/quantity. Only works while status is not_started
-    (this is for previewing/adjusting a plan before anything is in the ground); once a
-    planting is in_progress or complete, edit it in the app instead. Re-checks bounds and
+    (this is for previewing/adjusting a plan before anything is in the ground — use
+    activate_planting to mark it planted); once a planting is in_progress or complete, edit
+    it in the app instead. Re-checks bounds and
     overlap if position or dates change."""
     async with async_session() as db:
         user = await get_mcp_user(db)

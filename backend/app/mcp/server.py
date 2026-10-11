@@ -21,7 +21,7 @@ mcp_server = MCPServer(
         "Tools for reading and updating a personal square-foot-gardening plan in Tendril "
         "(USDA Zone 10a, St. Petersburg, FL — no frost, year-round growing). "
         "Prefer the list/get tools to answer questions before proposing changes, and use the "
-        "narrow write tools (create_planting, update_planting, delete_planting, complete_planting, "
+        "narrow write tools (create_planting, update_planting, delete_planting, activate_planting, complete_planting, "
         "create_task, update_task, update_task_status, update_container, create_plant_start, "
         "update_plant_start, delete_plant_start, create_variety, update_variety, create_category, update_category) for changes — there is "
         "no bulk-edit tool, and delete is limited to not-yet-started plantings, by design. "
