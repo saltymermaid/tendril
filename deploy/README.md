@@ -88,15 +88,30 @@ docker compose -f docker-compose.prod.yml up -d
 ## Backups
 
 ### Automated
-The `db-backup` service runs daily at 2 AM:
+The `db-backup` service runs daily at 2 AM (UTC):
 - Daily backups kept for 30 days
 - Weekly backups (Sunday) kept for 90 days
 - Stored in `deploy/backups/`
+- Uploaded to the R2 bucket `R2_BACKUP_BUCKET_NAME` (default `tendril-backups`)
+  under `daily/` and `weekly/`, using the same `R2_*` credentials as the backend.
+  The upload is skipped if those credentials aren't set.
+
+Check that it's working:
+```bash
+docker logs --tail 20 tendril-db-backup
+ls -lt deploy/backups/daily | head
+```
+
+### R2 setup
+1. Create a private bucket named `tendril-backups` (no public access, no custom domain).
+2. Make sure the R2 API token in `.env` has Object Read & Write on that bucket.
+3. Add lifecycle rules on the bucket so R2 matches local retention:
+   - prefix `daily/` → delete objects after 30 days
+   - prefix `weekly/` → delete objects after 90 days
 
 ### Manual Backup
 ```bash
-docker compose -f docker-compose.prod.yml exec db \
-  pg_dump -U tendril -Fc tendril | gzip > backup_$(date +%Y%m%d).sql.gz
+docker exec tendril-db-backup sh /backup.sh
 ```
 
 ### Restore

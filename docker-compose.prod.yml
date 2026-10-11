@@ -116,14 +116,21 @@ services:
       PGUSER: ${POSTGRES_USER}
       PGPASSWORD: ${POSTGRES_PASSWORD}
       PGDATABASE: ${POSTGRES_DB}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BACKUP_BUCKET_NAME: ${R2_BACKUP_BUCKET_NAME:-tendril-backups}
     volumes:
       - ./deploy/backups:/backups
       - ./deploy/scripts/backup.sh:/backup.sh:ro
     entrypoint: ["/bin/sh", "-c"]
+    # Run via `sh` so the cron job doesn't depend on the script's file mode,
+    # and send its output to the container's stdout so `docker logs` shows it.
     command:
       - |
-        echo "0 2 * * * /backup.sh" | crontab -
-        crond -f -l 2
+        apk add --no-cache aws-cli >/dev/null || echo "WARNING: failed to install aws-cli; R2 uploads will fail"
+        echo "0 2 * * * sh /backup.sh > /proc/1/fd/1 2>&1" | crontab -
+        exec crond -f -l 2
     restart: unless-stopped
     networks:
       - tendril-net
