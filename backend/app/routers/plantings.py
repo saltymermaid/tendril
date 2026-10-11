@@ -261,6 +261,64 @@ async def _rebalance_plant_start(db: AsyncSession, planting: Planting, new_quant
     start.quantity -= delta
 
 
+async def activate_planting_in_place(
+    db: AsyncSession, planting: Planting, actual_start_date: date | None
+) -> None:
+    """Move a not_started planting to in_progress, optionally moving its start_date to the
+    actual planting day (defaults to today; overlap is re-checked if it changes), and log a
+    planting event.
+
+    Shared by the REST activate route and the MCP activate_planting tool. Does not commit.
+    """
+    if planting.status != "not_started":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot activate planting with status '{planting.status}'. "
+            "Only 'not_started' plantings can be activated.",
+        )
+
+    actual_start = actual_start_date or date.today()
+
+    # If start date is changing, re-check overlap
+    if actual_start != planting.start_date:
+        if actual_start >= planting.end_date:
+            raise HTTPException(
+                status_code=400,
+                detail="actual_start_date must be before end_date",
+            )
+        await _check_overlap(
+            db=db,
+            user_id=planting.user_id,
+            container_id=planting.container_id,
+            square_x=planting.square_x,
+            square_y=planting.square_y,
+            square_width=planting.square_width,
+            square_height=planting.square_height,
+            start_date=actual_start,
+            end_date=planting.end_date,
+            tower_level=planting.tower_level,
+            exclude_planting_id=planting.id,
+        )
+        planting.start_date = actual_start
+
+    planting.status = "in_progress"
+
+    # Auto-create a planting event
+    planting_event = Event(
+        user_id=planting.user_id,
+        event_type="planting",
+        date=actual_start,
+        container_id=planting.container_id,
+        planting_id=planting.id,
+        variety_id=planting.variety_id,
+        square_x=planting.square_x,
+        square_y=planting.square_y,
+        tower_level=planting.tower_level,
+        notes=f"Planting activated — {planting.planting_method or 'direct sow'}",
+    )
+    db.add(planting_event)
+
+
 # --- Create planting ---
 @router.post("", response_model=PlantingResponse, status_code=status.HTTP_201_CREATED)
 async def create_planting(
@@ -588,55 +646,9 @@ async def activate_planting(
     if not planting:
         raise HTTPException(status_code=404, detail="Planting not found")
 
-    if planting.status != "not_started":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot activate planting with status '{planting.status}'. "
-            "Only 'not_started' plantings can be activated.",
-        )
-
-    actual_start = date.today()
-    if body and body.actual_start_date:
-        actual_start = body.actual_start_date
-
-    # If start date is changing, re-check overlap
-    if actual_start != planting.start_date:
-        if actual_start >= planting.end_date:
-            raise HTTPException(
-                status_code=400,
-                detail="actual_start_date must be before end_date",
-            )
-        await _check_overlap(
-            db=db,
-            user_id=current_user.id,
-            container_id=planting.container_id,
-            square_x=planting.square_x,
-            square_y=planting.square_y,
-            square_width=planting.square_width,
-            square_height=planting.square_height,
-            start_date=actual_start,
-            end_date=planting.end_date,
-            tower_level=planting.tower_level,
-            exclude_planting_id=planting.id,
-        )
-        planting.start_date = actual_start
-
-    planting.status = "in_progress"
-
-    # Auto-create a planting event
-    planting_event = Event(
-        user_id=current_user.id,
-        event_type="planting",
-        date=actual_start,
-        container_id=planting.container_id,
-        planting_id=planting.id,
-        variety_id=planting.variety_id,
-        square_x=planting.square_x,
-        square_y=planting.square_y,
-        tower_level=planting.tower_level,
-        notes=f"Planting activated — {planting.planting_method or 'direct sow'}",
+    await activate_planting_in_place(
+        db, planting, body.actual_start_date if body else None
     )
-    db.add(planting_event)
 
     await db.commit()
     await db.refresh(planting)
