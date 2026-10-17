@@ -26,6 +26,11 @@ class PlantingCreate(PlantingBase):
 
 
 class PlantingUpdate(BaseModel):
+    # Position — any of these moves the planting (see move_planting_in_place)
+    container_id: int | None = None
+    square_x: int | None = None
+    square_y: int | None = None
+    tower_level: int | None = None
     start_date: date | None = None
     end_date: date | None = None
     seed_start_date: date | None = None

@@ -27,6 +27,11 @@ interface ContainerDetail {
   yard_id: number | null
 }
 
+type ContainerSummary = Pick<
+  ContainerDetail,
+  'id' | 'name' | 'type' | 'width' | 'height' | 'levels' | 'pockets_per_level'
+>
+
 interface PlantingData {
   id: number
   container_id: number
@@ -186,12 +191,17 @@ export function ContainerDetailPage() {
   // Planting edit state
   const [editingPlanting, setEditingPlanting] = useState(false)
   const [editForm, setEditForm] = useState({
+    container_id: 0,
+    square_x: 0,
+    square_y: 0,
+    tower_level: null as number | null,
     start_date: '',
     end_date: '',
     seed_start_date: '' as string,
     planting_method: '' as string,
     quantity: '' as string,
   })
+  const [allContainers, setAllContainers] = useState<ContainerSummary[]>([])
   const [editError, setEditError] = useState('')
   const [editSubmitting, setEditSubmitting] = useState(false)
   const [deletingPlanting, setDeletingPlanting] = useState(false)
@@ -382,6 +392,10 @@ export function ContainerDetailPage() {
   function startEditPlanting() {
     if (!selectedPlanting) return
     setEditForm({
+      container_id: selectedPlanting.container_id,
+      square_x: selectedPlanting.square_x,
+      square_y: selectedPlanting.square_y,
+      tower_level: selectedPlanting.tower_level,
       start_date: selectedPlanting.start_date,
       end_date: selectedPlanting.end_date,
       seed_start_date: selectedPlanting.seed_start_date || '',
@@ -390,6 +404,25 @@ export function ContainerDetailPage() {
     })
     setEditError('')
     setEditingPlanting(true)
+    // Containers to move into — loaded lazily since only the edit form needs them
+    if (!allContainers.length) {
+      apiFetch('/api/containers')
+        .then(res => (res.ok ? res.json() : []))
+        .then(setAllContainers)
+        .catch(() => {})
+    }
+  }
+
+  // Changing the target container resets the position to its first square/pocket
+  function setEditContainer(containerId: number) {
+    const target = allContainers.find(c => c.id === containerId)
+    setEditForm(prev => ({
+      ...prev,
+      container_id: containerId,
+      square_x: 0,
+      square_y: 0,
+      tower_level: target?.type === 'tower' ? 0 : null,
+    }))
   }
 
   function cancelEditPlanting() {
@@ -406,6 +439,10 @@ export function ContainerDetailPage() {
 
     try {
       const body: Record<string, unknown> = {
+        container_id: editForm.container_id,
+        square_x: editForm.square_x,
+        square_y: editForm.square_y,
+        tower_level: editForm.tower_level,
         start_date: editForm.start_date,
         end_date: editForm.end_date,
         seed_start_date: editForm.seed_start_date || null,
@@ -425,6 +462,13 @@ export function ContainerDetailPage() {
       }
 
       const updated: PlantingData = await res.json()
+      if (updated.container_id !== selectedPlanting.container_id) {
+        // Moved to another container — it no longer belongs on this grid
+        setSelectedPlanting(null)
+        setEditingPlanting(false)
+        fetchPlantings(selectedDate)
+        return
+      }
       setSelectedPlanting(updated)
       setPlantings(prev => prev.map(p => (p.id === updated.id ? updated : p)))
       setEditingPlanting(false)
@@ -1224,6 +1268,84 @@ export function ContainerDetailPage() {
 
             {editingPlanting ? (
               <form onSubmit={handleUpdatePlanting}>
+                {(() => {
+                  const target =
+                    allContainers.find(c => c.id === editForm.container_id) ??
+                    (container?.id === editForm.container_id ? container : null)
+                  const range = (n: number) => Array.from({ length: Math.max(n, 0) }, (_, i) => i)
+                  return (
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Container</label>
+                        <select
+                          className="form-input"
+                          value={editForm.container_id}
+                          onChange={(e) => setEditContainer(Number(e.target.value))}
+                        >
+                          {(allContainers.length ? allContainers : container ? [container] : []).map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {target?.type === 'tower' ? (
+                        <>
+                          <div className="form-group">
+                            <label className="form-label">Level</label>
+                            <select
+                              className="form-input"
+                              value={editForm.tower_level ?? 0}
+                              onChange={(e) => setEditForm({ ...editForm, tower_level: Number(e.target.value) })}
+                            >
+                              {range(target.levels ?? 0).map(i => (
+                                <option key={i} value={i}>{i + 1}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Pocket</label>
+                            <select
+                              className="form-input"
+                              value={editForm.square_x}
+                              onChange={(e) => setEditForm({ ...editForm, square_x: Number(e.target.value) })}
+                            >
+                              {range(target.pockets_per_level ?? 0).map(i => (
+                                <option key={i} value={i}>{i + 1}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </>
+                      ) : target ? (
+                        <>
+                          <div className="form-group">
+                            <label className="form-label">Row</label>
+                            <select
+                              className="form-input"
+                              value={editForm.square_y}
+                              onChange={(e) => setEditForm({ ...editForm, square_y: Number(e.target.value) })}
+                            >
+                              {range((target.height ?? 0) - selectedPlanting.square_height + 1).map(i => (
+                                <option key={i} value={i}>{ROW_LABELS[i]}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Column</label>
+                            <select
+                              className="form-input"
+                              value={editForm.square_x}
+                              onChange={(e) => setEditForm({ ...editForm, square_x: Number(e.target.value) })}
+                            >
+                              {range((target.width ?? 0) - selectedPlanting.square_width + 1).map(i => (
+                                <option key={i} value={i}>{i + 1}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
+                  )
+                })()}
+
                 <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">Start Date *</label>

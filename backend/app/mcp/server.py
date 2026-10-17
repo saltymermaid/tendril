@@ -25,6 +25,8 @@ mcp_server = MCPServer(
         "create_task, update_task, update_task_status, update_container, create_plant_start, "
         "update_plant_start, delete_plant_start, create_variety, update_variety, create_category, update_category) for changes — there is "
         "no bulk-edit tool, and delete is limited to not-yet-started plantings, by design. "
+        "To fix a planting recorded in the wrong spot, move it with update_planting rather than "
+        "deleting and recreating it — that works in any status and keeps its history. "
         "When the user dictates garden to-dos (often by voice, so expect sound-alike names), create "
         "one task per item and link each to its container or planting; when they ask what to do "
         "today or this week, list pending tasks for that range (undated tasks are included)."

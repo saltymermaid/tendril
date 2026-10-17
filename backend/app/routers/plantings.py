@@ -3,7 +3,7 @@
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -11,8 +11,10 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.container import Container
 from app.models.event import Event
+from app.models.journal_note import JournalNote
 from app.models.plant_start import PlantStart
 from app.models.planting import Planting
+from app.models.task import Task
 from app.models.user import User
 from app.models.variety import Variety
 from app.schemas.planting import (
@@ -259,6 +261,72 @@ async def _rebalance_plant_start(db: AsyncSession, planting: Planting, new_quant
     if delta > start.quantity:
         raise HTTPException(status_code=400, detail="Not enough remaining in this start")
     start.quantity -= delta
+
+
+async def move_planting_in_place(
+    db: AsyncSession,
+    planting: Planting,
+    container: Container,
+    square_x: int,
+    square_y: int,
+    tower_level: int | None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> None:
+    """Move a planting to a different square/pocket, optionally in a different container,
+    keeping its footprint (width/height). Allowed in any status — it's a correction of where
+    something was recorded, not a transplant. Bounds and overlap are checked at the new spot
+    (against start_date/end_date if the caller is changing them too), and the planting's own
+    events, journal notes, and tasks follow it so its history stays attached to the right spot.
+
+    Shared by the REST update route and the MCP move/update tools. Does not commit.
+    """
+    if container.type != "tower":
+        tower_level = None
+    validate_planting_bounds(
+        container=container,
+        square_x=square_x,
+        square_y=square_y,
+        square_width=planting.square_width,
+        square_height=planting.square_height,
+        tower_level=tower_level,
+    )
+    await _check_overlap(
+        db=db,
+        user_id=planting.user_id,
+        container_id=container.id,
+        square_x=square_x,
+        square_y=square_y,
+        square_width=planting.square_width,
+        square_height=planting.square_height,
+        start_date=start_date or planting.start_date,
+        end_date=end_date or planting.end_date,
+        tower_level=tower_level,
+        exclude_planting_id=planting.id,
+    )
+
+    for model in (Event, JournalNote):
+        await db.execute(
+            update(model)
+            .where(model.planting_id == planting.id)
+            .values(
+                container_id=container.id,
+                square_x=square_x,
+                square_y=square_y,
+                tower_level=tower_level,
+            )
+        )
+    await db.execute(
+        update(Task).where(Task.planting_id == planting.id).values(container_id=container.id)
+    )
+
+    # Set the relationship too (not just container_id) so an already-loaded planting.container
+    # doesn't keep pointing at the old container — sessions don't expire on commit.
+    planting.container_id = container.id
+    planting.container = container
+    planting.square_x = square_x
+    planting.square_y = square_y
+    planting.tower_level = tower_level
 
 
 async def activate_planting_in_place(
@@ -569,7 +637,8 @@ async def update_planting(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update a planting (dates, method, quantity, status)."""
+    """Update a planting (position, dates, method, quantity, status). Changing container_id,
+    square_x/square_y, or tower_level moves it — see move_planting_in_place."""
     result = await db.execute(
         select(Planting)
         .options(
@@ -595,7 +664,40 @@ async def update_planting(
     if new_seed_start and new_seed_start > new_start:
         raise HTTPException(status_code=400, detail="seed_start_date must be on or before start_date")
 
-    if "start_date" in update_data or "end_date" in update_data:
+    # Position fields are handled by move_planting_in_place, not the generic setattr below.
+    # A null container_id/square_x/square_y means "unchanged"; tower_level is taken as given.
+    new_container_id = update_data.pop("container_id", None) or planting.container_id
+    new_x = update_data.pop("square_x", None)
+    new_x = planting.square_x if new_x is None else new_x
+    new_y = update_data.pop("square_y", None)
+    new_y = planting.square_y if new_y is None else new_y
+    new_level = update_data.pop("tower_level", planting.tower_level)
+
+    if (new_container_id, new_x, new_y, new_level) != (
+        planting.container_id, planting.square_x, planting.square_y, planting.tower_level
+    ):
+        target_container = planting.container
+        if new_container_id != planting.container_id:
+            result = await db.execute(
+                select(Container).where(
+                    Container.id == new_container_id,
+                    Container.user_id == current_user.id,
+                )
+            )
+            target_container = result.scalar_one_or_none()
+            if not target_container:
+                raise HTTPException(status_code=404, detail="Container not found")
+        await move_planting_in_place(
+            db,
+            planting,
+            target_container,
+            square_x=new_x,
+            square_y=new_y,
+            tower_level=new_level,
+            start_date=new_start,
+            end_date=new_end,
+        )
+    elif "start_date" in update_data or "end_date" in update_data:
         await _check_overlap(
             db=db,
             user_id=current_user.id,
