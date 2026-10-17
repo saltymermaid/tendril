@@ -1,8 +1,9 @@
 """Narrow write MCP tools — create/update varieties and categories, create/edit/delete a
 planting, mark a planting as planted (activate), complete a planting, create/edit a task, change a task's status, create/edit/delete a
-plant start, edit a container's name/location/irrigation. update_planting and delete_planting are
-both restricted to not_started plantings — editing or removing something already in the ground
-stays REST/UI-only (see activate_planting for recording that it went in, and complete_planting
+plant start, edit a container's name/location/irrigation. delete_planting is restricted to
+not_started plantings, and so is most of update_planting — once something is in the ground, chat
+can only move it (to fix where it was recorded) or change its end_date; other edits and removing
+it stay REST/UI-only (see activate_planting for recording that it went in, and complete_planting
 for recording an actual removal). No yard mutations, and
 no container resize/create/delete, by design (see the plan's confirmed v1 write scope) — variety,
 category, plant-start, and container-detail writes were added on top of that scope so the garden
@@ -52,6 +53,7 @@ from app.routers.plantings import (
     _check_overlap,
     activate_planting_in_place,
     _consume_plant_start,
+    move_planting_in_place,
     _rebalance_plant_start,
     validate_planting_bounds,
 )
@@ -441,21 +443,31 @@ async def complete_planting(
 @mcp_server.tool()
 async def update_planting(
     planting_id: int,
+    container_id: int | None = None,
     square_x: int | None = None,
     square_y: int | None = None,
+    tower_level: int | None = None,
+    end_date: date | None = None,
     variety_id: int | None = None,
     start_date: date | None = None,
-    end_date: date | None = None,
     seed_start_date: date | None = None,
     planting_method: str | None = None,
     quantity: int | None = None,
 ) -> dict:
-    """Edit a planned (not_started) planting — move it to a different square, swap its
-    variety, or adjust its dates/method/quantity. Only works while status is not_started
-    (this is for previewing/adjusting a plan before anything is in the ground — use
-    activate_planting to mark it planted); once a planting is in_progress or complete, edit
-    it in the app instead. Re-checks bounds and
-    overlap if position or dates change."""
+    """Edit a planting. Only the fields you pass are changed.
+
+    In any status (planned, in the ground, or complete):
+    - Move it — container_id (to put it in a different bed/tower), square_x/square_y, and
+      tower_level (required when moving into a tower). Use this to fix a planting recorded in
+      the wrong spot instead of deleting and recreating it; its footprint (width/height) is
+      kept, and its events, notes, and tasks move with it.
+    - Change end_date — e.g. extend a crop that's still producing, or pull in a planned
+      removal. Use complete_planting, not this, to record that it actually came out.
+
+    Only while not_started (planned, nothing in the ground yet): variety_id, start_date,
+    seed_start_date, planting_method, quantity. Use activate_planting to mark it planted.
+
+    Re-checks bounds and overlap at the new position/dates."""
     async with async_session() as db:
         user = await get_mcp_user(db)
 
@@ -467,19 +479,28 @@ async def update_planting(
         planting = result.scalar_one_or_none()
         if not planting:
             raise ToolError(f"Planting {planting_id} not found")
+
+        plan_only = {
+            "variety_id": variety_id,
+            "start_date": start_date,
+            "seed_start_date": seed_start_date,
+            "planting_method": planting_method,
+            "quantity": quantity,
+        }
         if planting.status != "not_started":
-            raise ToolError(
-                f"Cannot edit planting with status '{planting.status}' via chat. "
-                "Only 'not_started' plantings can be edited this way."
-            )
+            passed = [name for name, value in plan_only.items() if value is not None]
+            if passed:
+                raise ToolError(
+                    f"Cannot change {', '.join(passed)} on a planting with status "
+                    f"'{planting.status}' via chat — only position and end_date can be edited "
+                    "once it's in the ground."
+                )
 
         if variety_id is not None:
             result = await db.execute(select(Variety).where(Variety.id == variety_id, Variety.user_id == user.id))
             if not result.scalar_one_or_none():
                 raise ToolError(f"Variety {variety_id} not found")
 
-        new_x = square_x if square_x is not None else planting.square_x
-        new_y = square_y if square_y is not None else planting.square_y
         new_start = start_date or planting.start_date
         new_end = end_date or planting.end_date
         new_seed_start = seed_start_date if seed_start_date is not None else planting.seed_start_date
@@ -489,33 +510,50 @@ async def update_planting(
         if new_seed_start and new_seed_start > new_start:
             raise ToolError("seed_start_date must be on or before start_date")
 
+        target_container = planting.container
+        if container_id is not None and container_id != planting.container_id:
+            result = await db.execute(
+                select(Container).where(Container.id == container_id, Container.user_id == user.id)
+            )
+            target_container = result.scalar_one_or_none()
+            if not target_container:
+                raise ToolError(f"Container {container_id} not found")
+        new_x = square_x if square_x is not None else planting.square_x
+        new_y = square_y if square_y is not None else planting.square_y
+        new_level = tower_level if tower_level is not None else planting.tower_level
+        moving = (target_container.id, new_x, new_y, new_level) != (
+            planting.container_id, planting.square_x, planting.square_y, planting.tower_level
+        )
+
         try:
-            validate_planting_bounds(
-                container=planting.container,
-                square_x=new_x,
-                square_y=new_y,
-                square_width=planting.square_width,
-                square_height=planting.square_height,
-                tower_level=planting.tower_level,
-            )
-            await _check_overlap(
-                db=db,
-                user_id=user.id,
-                container_id=planting.container_id,
-                square_x=new_x,
-                square_y=new_y,
-                square_width=planting.square_width,
-                square_height=planting.square_height,
-                start_date=new_start,
-                end_date=new_end,
-                tower_level=planting.tower_level,
-                exclude_planting_id=planting.id,
-            )
+            if moving:
+                await move_planting_in_place(
+                    db,
+                    planting,
+                    target_container,
+                    square_x=new_x,
+                    square_y=new_y,
+                    tower_level=new_level,
+                    start_date=new_start,
+                    end_date=new_end,
+                )
+            elif (new_start, new_end) != (planting.start_date, planting.end_date):
+                await _check_overlap(
+                    db=db,
+                    user_id=user.id,
+                    container_id=planting.container_id,
+                    square_x=planting.square_x,
+                    square_y=planting.square_y,
+                    square_width=planting.square_width,
+                    square_height=planting.square_height,
+                    start_date=new_start,
+                    end_date=new_end,
+                    tower_level=planting.tower_level,
+                    exclude_planting_id=planting.id,
+                )
         except HTTPException as exc:
             raise ToolError(exc.detail) from exc
 
-        planting.square_x = new_x
-        planting.square_y = new_y
         if variety_id is not None:
             planting.variety_id = variety_id
         planting.start_date = new_start
