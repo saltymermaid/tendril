@@ -36,7 +36,7 @@ from app.mcp.context import get_mcp_user
 from app.models.category import Category, PlantingSeason
 from app.models.container import Container
 from app.models.plant_start import PlantStart
-from app.models.planting import Planting
+from app.models.planting import REMOVAL_REASONS, Planting
 from app.models.task import TASK_CATEGORIES, Task
 from app.models.variety import Variety
 from app.mcp.tools_read import (
@@ -59,7 +59,6 @@ from app.routers.plantings import (
 )
 from app.services.localtime import to_utc
 
-VALID_REMOVAL_REASONS = {"harvest_complete", "died", "pulled_early", "pest_disease", "other"}
 VALID_PLANTING_METHODS = {"direct_sow", "transplant", "both"}
 VALID_HARVEST_TYPES = {"single", "continuous", "none"}
 VALID_TASK_STATUSES = {"pending", "completed", "dismissed"}
@@ -369,12 +368,18 @@ async def create_planting(
 async def activate_planting(
     planting_id: int,
     actual_start_date: date | None = None,
+    previous_removal_reason: str | None = None,
 ) -> dict:
     """Mark a planned planting as planted — transition it from not_started to in_progress and
     log a planting event. Use this when the user says they've sown/transplanted something that
     was already in the plan. actual_start_date is the day it actually went into the square
     (defaults to today); if it differs from the planned start_date, start_date moves to it and
-    the squares are re-checked for overlap. end_date is left unchanged."""
+    the squares are re-checked for overlap. end_date is left unchanged.
+
+    If an earlier planting is still in_progress on any of the same squares, this fails and
+    names it. Ask the user why it came out, then retry with previous_removal_reason (one of
+    harvest_complete, died, pulled_early, pest_disease, other) to complete it as of the
+    planting day and plant this in one step."""
     async with async_session() as db:
         user = await get_mcp_user(db)
 
@@ -384,9 +389,10 @@ async def activate_planting(
             raise ToolError(f"Planting {planting_id} not found")
 
         try:
-            await activate_planting_in_place(db, planting, actual_start_date)
+            await activate_planting_in_place(db, planting, actual_start_date, previous_removal_reason)
         except HTTPException as exc:
-            raise ToolError(exc.detail) from exc
+            detail = exc.detail["message"] if isinstance(exc.detail, dict) else exc.detail
+            raise ToolError(detail) from exc
         await db.commit()
 
         result = await db.execute(
@@ -419,8 +425,8 @@ async def complete_planting(
                 f"Cannot complete planting with status '{planting.status}'. "
                 "Only 'in_progress' plantings can be completed."
             )
-        if removal_reason not in VALID_REMOVAL_REASONS:
-            raise ToolError(f"Invalid removal_reason. Must be one of: {', '.join(sorted(VALID_REMOVAL_REASONS))}")
+        if removal_reason not in REMOVAL_REASONS:
+            raise ToolError(f"Invalid removal_reason. Must be one of: {', '.join(sorted(REMOVAL_REASONS))}")
 
         actual_end = actual_end_date or date.today()
         if actual_end < planting.start_date:

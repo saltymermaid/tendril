@@ -43,6 +43,9 @@ class PlantingUpdate(BaseModel):
 class ActivatePlanting(BaseModel):
     """Request body for activating a planting (Not Started → In Progress)."""
     actual_start_date: date | None = None  # Defaults to today if not provided
+    # If something is still growing on these squares, mark it complete (as of the planting
+    # day) with this removal reason. Without it, activating is refused while it's there.
+    replace_reason: str | None = None
 
 
 class CompletePlanting(BaseModel):

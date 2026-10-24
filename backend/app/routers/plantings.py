@@ -3,7 +3,7 @@
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -13,7 +13,7 @@ from app.models.container import Container
 from app.models.event import Event
 from app.models.journal_note import JournalNote
 from app.models.plant_start import PlantStart
-from app.models.planting import Planting
+from app.models.planting import REMOVAL_REASONS, Planting
 from app.models.task import Task
 from app.models.user import User
 from app.models.variety import Variety
@@ -27,7 +27,7 @@ from app.schemas.planting import (
     PlantingUpdate,
 )
 from app.services.lifecycle import compute_lifecycle_phase, _avg_days
-from app.services.succession import is_overdue, next_plantings_for_overdue
+from app.services.succession import is_overdue, next_plantings_for_overdue, shares_squares
 
 router = APIRouter(prefix="/api/plantings", tags=["plantings"])
 
@@ -345,12 +345,36 @@ async def move_planting_in_place(
     planting.tower_level = tower_level
 
 
+async def _still_growing_on(db: AsyncSession, planting: Planting, on: date) -> list[Planting]:
+    """in_progress plantings sharing any of `planting`'s squares that went in on or before
+    `on`. Their end_date is only an estimate, so they're still there until completed."""
+    result = await db.execute(
+        select(Planting)
+        .options(selectinload(Planting.variety))
+        .where(
+            Planting.user_id == planting.user_id,
+            Planting.container_id == planting.container_id,
+            Planting.status == "in_progress",
+            Planting.start_date <= on,
+            Planting.id != planting.id,
+        )
+    )
+    return [p for p in result.scalars().all() if shares_squares(p, planting)]
+
+
 async def activate_planting_in_place(
-    db: AsyncSession, planting: Planting, actual_start_date: date | None
+    db: AsyncSession,
+    planting: Planting,
+    actual_start_date: date | None,
+    replace_reason: str | None = None,
 ) -> None:
     """Move a not_started planting to in_progress, optionally moving its start_date to the
     actual planting day (defaults to today; overlap is re-checked if it changes), and log a
     planting event.
+
+    If an earlier planting is still growing on any of its squares, this is refused (409,
+    with the plantings in `still_growing`) unless `replace_reason` is given — then those are
+    completed as of the planting day with that removal reason first.
 
     Shared by the REST activate route and the MCP activate_planting tool. Does not commit.
     """
@@ -362,6 +386,37 @@ async def activate_planting_in_place(
         )
 
     actual_start = actual_start_date or date.today()
+
+    still_growing = await _still_growing_on(db, planting, actual_start)
+    if still_growing:
+        if replace_reason is None:
+            names = ", ".join(
+                f"{p.variety.name if p.variety else 'a planting'} (planting {p.id})" for p in still_growing
+            )
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": f"{names} still growing on these squares — mark it done first, "
+                    "or give a removal reason to do both at once",
+                    "still_growing": [
+                        {
+                            "id": p.id,
+                            "variety_name": p.variety.name if p.variety else None,
+                            "start_date": p.start_date.isoformat(),
+                        }
+                        for p in still_growing
+                    ],
+                },
+            )
+        if replace_reason not in REMOVAL_REASONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid removal reason. Must be one of: {', '.join(sorted(REMOVAL_REASONS))}",
+            )
+        for p in still_growing:
+            p.end_date = actual_start
+            p.status = "complete"
+            p.removal_reason = replace_reason
 
     # If start date is changing, re-check overlap
     if actual_start != planting.start_date:
@@ -508,8 +563,11 @@ async def get_timeline(
     """Get plantings with lifecycle phase boundaries for Gantt chart rendering.
 
     Returns plantings that overlap with the given date range, including
-    computed phase boundaries (germination_end, harvest_start) for each.
+    computed phase boundaries (germination_end, harvest_start) for each. An overdue
+    planting (still in_progress past its estimated end_date) is in the ground through
+    today, which comes back as `overdue_until` so the chart can draw that stretch.
     """
+    today = date.today()
     query = (
         select(Planting)
         .options(
@@ -520,7 +578,10 @@ async def get_timeline(
             Planting.user_id == current_user.id,
             # Planting overlaps with the requested range
             Planting.start_date <= end_date,
-            Planting.end_date >= start_date,
+            or_(
+                Planting.end_date >= start_date,
+                and_(Planting.status == "in_progress", start_date <= today),
+            ),
         )
         .order_by(Planting.start_date)
     )
@@ -559,6 +620,7 @@ async def get_timeline(
             "category_icon_svg": variety.category.icon_svg if variety and variety.category else None,
             "start_date": p.start_date.isoformat(),
             "end_date": p.end_date.isoformat(),
+            "overdue_until": today.isoformat() if is_overdue(p, today) else None,
             "germination_end": germination_end,
             "harvest_start": harvest_start,
             "status": p.status,
@@ -751,7 +813,8 @@ async def activate_planting(
     """Transition a planting from Not Started to In Progress.
 
     Optionally set the actual start date (defaults to today).
-    If the start date changes, re-checks overlap.
+    If the start date changes, re-checks overlap. If something's still growing on the
+    squares, returns 409 unless replace_reason is given to mark it done at the same time.
     """
     result = await db.execute(
         select(Planting).where(
@@ -764,7 +827,10 @@ async def activate_planting(
         raise HTTPException(status_code=404, detail="Planting not found")
 
     await activate_planting_in_place(
-        db, planting, body.actual_start_date if body else None
+        db,
+        planting,
+        body.actual_start_date if body else None,
+        body.replace_reason if body else None,
     )
 
     await db.commit()
@@ -803,11 +869,10 @@ async def complete_planting(
             "Only 'in_progress' plantings can be completed.",
         )
 
-    valid_reasons = {"harvest_complete", "died", "pulled_early", "pest_disease", "other"}
-    if body.removal_reason not in valid_reasons:
+    if body.removal_reason not in REMOVAL_REASONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid removal_reason. Must be one of: {', '.join(sorted(valid_reasons))}",
+            detail=f"Invalid removal_reason. Must be one of: {', '.join(sorted(REMOVAL_REASONS))}",
         )
 
     actual_end = date.today()
