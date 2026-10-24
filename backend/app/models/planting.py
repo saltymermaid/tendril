@@ -8,6 +8,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 
+# Why a planting came out of the ground (Planting.removal_reason)
+REMOVAL_REASONS = {"harvest_complete", "died", "pulled_early", "pest_disease", "other"}
+
+
 class Planting(Base):
     """A planting record assigning a variety to a square/level for a time period. Per-user data."""
 

@@ -20,6 +20,8 @@
  *   - Month grid lines
  *   - Click a bar to navigate to planting detail
  *   - Status-based visual treatments (not_started=dashed, complete=muted)
+ *   - Overdue plantings (still growing past their estimated end) get a hatched
+ *     extension from end_date through today
  *   - Variety name label rendered on each bar (square view)
  */
 
@@ -37,6 +39,8 @@ export interface TimelinePlanting {
   category_icon_svg: string | null
   start_date: string
   end_date: string
+  /** today, when the planting is still growing past end_date; null otherwise */
+  overdue_until?: string | null
   germination_end: string
   harvest_start: string
   status: string
@@ -142,6 +146,15 @@ function renderBar(
   const harvestX = growX + growW
   const harvestW = Math.max(0, barWidth - germW - growW)
 
+  // Overdue stretch: end_date → today, drawn hatched after the estimated bar
+  const overdueStartDay = Math.max(0, daysBetween(rangeStart, pEnd))
+  const overdueEndDay = p.overdue_until
+    ? Math.min(totalDays, daysBetween(rangeStart, parseDate(p.overdue_until)) + 1)
+    : overdueStartDay
+  const overdueX = LEFT_LABEL_WIDTH + overdueStartDay * DAY_WIDTH
+  const overdueW = Math.max(0, (overdueEndDay - overdueStartDay) * DAY_WIDTH)
+  const hatchId = `overdue-hatch-${key}`
+
   let germColor = lightenColor(color, 0.6)
   let growColor = lightenColor(color, 0.3)
   let harvestColor = color
@@ -174,7 +187,24 @@ function renderBar(
       style={{ cursor: 'pointer' }}
       onClick={() => navigate(`/plantings/${p.id}`)}
     >
-      <title>{statusLabel(p.status)} · {p.variety_name ?? 'Unknown'} · {p.start_date} – {p.end_date}</title>
+      <title>
+        {statusLabel(p.status)} · {p.variety_name ?? 'Unknown'} · {p.start_date} – {p.end_date}
+        {p.overdue_until ? ' · still growing past its estimated end' : ''}
+      </title>
+      {/* Overdue stretch (behind the main bar so its rounded end stays crisp) */}
+      {overdueW > 0 && (
+        <>
+          <defs>
+            <pattern id={hatchId} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <rect width="6" height="6" fill={lightenColor(color, 0.6)} />
+              <line x1="0" y1="0" x2="0" y2="6" stroke={color} strokeWidth="2" />
+            </pattern>
+          </defs>
+          {/* Tuck 3px under the main bar so the join has no gap — unless the bar starts off-chart */}
+          <rect x={overdueX - (overdueStartDay > 0 ? 3 : 0)} y={barTop} width={overdueW + (overdueStartDay > 0 ? 3 : 0)} height={barH} rx={3} ry={3}
+            fill={`url(#${hatchId})`} stroke={color} strokeWidth={1} strokeDasharray="3,2" />
+        </>
+      )}
       {/* Bar outline */}
       <rect
         x={barX}
@@ -673,6 +703,15 @@ export function GanttChart({ plantings, containers, startDate, endDate, groupBy 
         <div className="gantt-legend-item">
           <span className="gantt-legend-swatch gantt-legend-dashed" />
           Not Started
+        </div>
+        <div className="gantt-legend-item">
+          <span
+            className="gantt-legend-swatch"
+            style={{
+              background: `repeating-linear-gradient(45deg, #38A169 0 2px, ${lightenColor('#38A169', 0.6)} 2px 5px)`,
+            }}
+          />
+          Past estimated end
         </div>
         <div className="gantt-legend-item">
           <span className="gantt-legend-line" />

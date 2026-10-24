@@ -1,4 +1,6 @@
 import { apiFetch } from "../lib/api"
+import { activatePlanting, REMOVAL_REASONS, type StillGrowing } from '../lib/plantings'
+import { StillGrowingModal } from '../components/StillGrowingModal'
 import { useEffect, useState, useCallback } from 'react'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 
@@ -72,14 +74,6 @@ type TimelineItem = {
 
 const ROW_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
-const REMOVAL_REASONS = [
-  { value: 'harvest_complete', label: '🌾 Harvest Complete' },
-  { value: 'died', label: '💀 Died' },
-  { value: 'pulled_early', label: '🔄 Pulled Early' },
-  { value: 'pest_disease', label: '🐛 Pest / Disease' },
-  { value: 'other', label: '📝 Other' },
-]
-
 const HARVEST_UNITS = [
   { value: 'count', label: 'Count' },
   { value: 'lbs', label: 'Pounds' },
@@ -101,6 +95,8 @@ export function PlantingDetailPage() {
   const [showRemoveModal, setShowRemoveModal] = useState(false)
   const [removalReason, setRemovalReason] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  // Set when "Plant Now" finds an earlier planting still growing on these squares
+  const [stillGrowing, setStillGrowing] = useState<StillGrowing[] | null>(null)
 
   // Events & Notes
   const [events, setEvents] = useState<EventData[]>([])
@@ -173,21 +169,21 @@ export function PlantingDetailPage() {
     }
   }
 
-  async function handleActivate() {
+  async function handleActivate(replaceReason?: string) {
+    if (!id) return
     setActionLoading(true)
     setError('')
     try {
-      const res = await apiFetch(`/api/plantings/${id}/activate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.detail || 'Failed to activate')
+      const result = await activatePlanting<PlantingDetail>(id, replaceReason)
+      if (result.ok) {
+        setPlanting(result.planting)
+        setStillGrowing(null)
+        fetchEvents() // Refresh events to show auto-created planting event
+      } else if ('stillGrowing' in result) {
+        setStillGrowing(result.stillGrowing)
+      } else {
+        setError(result.error)
       }
-      setPlanting(await res.json())
-      fetchEvents() // Refresh events to show auto-created planting event
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to activate planting')
     } finally {
@@ -383,7 +379,7 @@ export function PlantingDetailPage() {
             {planting.status === 'not_started' && (
               <>
                 <button
-                  onClick={handleActivate}
+                  onClick={() => handleActivate()}
                   className="btn btn-primary btn-sm"
                   disabled={actionLoading}
                 >
@@ -615,6 +611,17 @@ export function PlantingDetailPage() {
       </div>
 
       {error && <div className="form-message error">{error}</div>}
+
+      {stillGrowing && planting && (
+        <StillGrowingModal
+          newVarietyName={planting.variety_name}
+          stillGrowing={stillGrowing}
+          busy={actionLoading}
+          error={error}
+          onConfirm={reason => handleActivate(reason)}
+          onCancel={() => setStillGrowing(null)}
+        />
+      )}
 
       {/* Remove / Complete Modal */}
       {showRemoveModal && (

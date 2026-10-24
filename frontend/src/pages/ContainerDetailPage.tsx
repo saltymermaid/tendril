@@ -1,4 +1,6 @@
 import { apiFetch } from "../lib/api"
+import { activatePlanting, type StillGrowing } from '../lib/plantings'
+import { StillGrowingModal } from '../components/StillGrowingModal'
 import { useEffect, useState, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 
@@ -129,6 +131,9 @@ function statusLabel(status: string): string {
   }
 }
 
+// A planned planting "Plant Now" is about to put in the ground
+type PlantingToActivate = { id: number; variety_name: string | null }
+
 // "Up next" note for an overdue planting with something planned behind it. `due` once the
 // planned start date has arrived (as of the date being viewed) — time to pull the old plant.
 function nextUpInfo(p: PlantingData, asOf: string): { text: string; due: boolean } | null {
@@ -205,6 +210,12 @@ export function ContainerDetailPage() {
   // Selected planting for detail view
   const [selectedPlanting, setSelectedPlanting] = useState<PlantingData | null>(null)
   const [activating, setActivating] = useState(false)
+  const [activateError, setActivateError] = useState('')
+  // Set when "Plant Now" finds an earlier planting still growing on these squares
+  const [stillGrowing, setStillGrowing] = useState<{
+    planting: PlantingToActivate
+    growing: StillGrowing[]
+  } | null>(null)
 
   // Planting edit state
   const [editingPlanting, setEditingPlanting] = useState(false)
@@ -394,14 +405,22 @@ export function ContainerDetailPage() {
     }
   }
 
-  async function handleActivatePlanting(plantingId: number) {
+  async function handleActivatePlanting(target: PlantingToActivate, replaceReason?: string) {
     setActivating(true)
+    setActivateError('')
     try {
-      const res = await apiFetch(`/api/plantings/${plantingId}/activate`, { method: 'POST' })
-      if (res.ok) {
+      const result = await activatePlanting<PlantingData>(target.id, replaceReason)
+      if (result.ok) {
         setSelectedPlanting(null)
+        setStillGrowing(null)
         fetchPlantings(selectedDate)
+      } else if ('stillGrowing' in result) {
+        setStillGrowing({ planting: target, growing: result.stillGrowing })
+      } else {
+        setActivateError(result.error)
       }
+    } catch (err: unknown) {
+      setActivateError(err instanceof Error ? err.message : 'Failed to mark as planted')
     } finally {
       setActivating(false)
     }
@@ -712,6 +731,7 @@ export function ContainerDetailPage() {
     const planting = getPlantingAt(x, y)
     if (planting) {
       setSelectedPlanting(planting)
+      setActivateError('')
       setEditingPlanting(false)
       setEditError('')
       setSupportMenu(null)
@@ -976,6 +996,7 @@ export function ContainerDetailPage() {
                         onClick={() => {
                           if (planting) {
                             setSelectedPlanting(planting)
+                            setActivateError('')
                             setEditingPlanting(false)
                             setEditError('')
                           } else {
@@ -1502,10 +1523,18 @@ export function ContainerDetailPage() {
                       return (
                         <div className={`next-up-note ${nextUp?.due ? 'due' : ''}`}>
                           Past its estimated end date, so it stays in the ground until you mark it done.
-                          {nextUp && (
+                          {nextUp && selectedPlanting.next_planting && (
                             <>
                               <br />
                               <span aria-hidden="true">🌱</span> {nextUp.text}.
+                              {' '}
+                              <button
+                                className="next-up-action"
+                                onClick={() => handleActivatePlanting(selectedPlanting.next_planting!)}
+                                disabled={activating}
+                              >
+                                Plant it now
+                              </button>
                             </>
                           )}
                         </div>
@@ -1533,6 +1562,7 @@ export function ContainerDetailPage() {
                 </div>
 
                 {deleteError && <div className="form-message error">{deleteError}</div>}
+                {activateError && !stillGrowing && <div className="form-message error">{activateError}</div>}
 
                 <div className="modal-actions">
                   <button className="btn btn-outline-dark" onClick={startEditPlanting}>
@@ -1547,7 +1577,7 @@ export function ContainerDetailPage() {
                   {selectedPlanting.status === 'not_started' && (
                     <button
                       className="btn btn-primary"
-                      onClick={() => handleActivatePlanting(selectedPlanting.id)}
+                      onClick={() => handleActivatePlanting(selectedPlanting)}
                       disabled={activating}
                     >
                       {activating ? '…' : '🌱 Plant Now'}
@@ -1863,6 +1893,17 @@ export function ContainerDetailPage() {
             )}
           </div>
         </div>
+      )}
+
+      {stillGrowing && (
+        <StillGrowingModal
+          newVarietyName={stillGrowing.planting.variety_name}
+          stillGrowing={stillGrowing.growing}
+          busy={activating}
+          error={activateError}
+          onConfirm={reason => handleActivatePlanting(stillGrowing.planting, reason)}
+          onCancel={() => setStillGrowing(null)}
+        />
       )}
     </div>
   )

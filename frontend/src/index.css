@@ -2309,6 +2309,17 @@ select.form-input {
   font-size: var(--text-sm);
 }
 
+.next-up-note .next-up-action {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .next-up-note.due {
   border-left-color: var(--color-warning);
   background: color-mix(in srgb, var(--color-warning) 15%, transparent);
