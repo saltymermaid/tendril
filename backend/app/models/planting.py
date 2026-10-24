@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import ColumnElement, Date, DateTime, ForeignKey, Integer, String, and_, func, or_
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -61,6 +61,19 @@ class Planting(Base):
     events: Mapped[list["Event"]] = relationship(back_populates="planting")  # noqa: F821
     journal_notes: Mapped[list["JournalNote"]] = relationship(back_populates="planting")  # noqa: F821
     tasks: Mapped[list["Task"]] = relationship(back_populates="planting")  # noqa: F821
+
+    @classmethod
+    def in_ground_on(cls, on: date) -> ColumnElement[bool]:
+        """SQL filter for plantings occupying their squares on `on`.
+
+        end_date is only an estimate, so a planting that's still in_progress past it stays
+        in the ground until it's marked complete — through today, not into the future, so
+        views of upcoming dates still show the plan.
+        """
+        not_ended = cls.end_date > on
+        if on <= date.today():
+            not_ended = or_(not_ended, cls.status == "in_progress")
+        return and_(cls.start_date <= on, not_ended)
 
     def __repr__(self) -> str:
         return f"<Planting(id={self.id}, variety_id={self.variety_id}, status='{self.status}')>"

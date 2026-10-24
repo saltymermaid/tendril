@@ -594,10 +594,7 @@ async def get_container_plantings(
     )
 
     if as_of:
-        query = query.where(
-            Planting.start_date <= as_of,
-            Planting.end_date > as_of,
-        )
+        query = query.where(Planting.in_ground_on(as_of))
 
     result = await db.execute(query)
     plantings = result.scalars().all()
