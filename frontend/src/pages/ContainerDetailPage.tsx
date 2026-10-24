@@ -51,6 +51,10 @@ interface PlantingData {
   category_name: string | null
   category_color: string | null
   category_icon_svg: string | null
+  // Still growing past its estimated end_date — it keeps its squares until marked done
+  overdue: boolean
+  // The planned planting waiting for this overdue planting's squares
+  next_planting: { id: number; variety_name: string | null; start_date: string } | null
 }
 
 interface Variety {
@@ -122,6 +126,20 @@ function statusLabel(status: string): string {
     case 'in_progress': return 'Growing'
     case 'complete': return 'Done'
     default: return status.replace(/_/g, ' ')
+  }
+}
+
+// "Up next" note for an overdue planting with something planned behind it. `due` once the
+// planned start date has arrived (as of the date being viewed) — time to pull the old plant.
+function nextUpInfo(p: PlantingData, asOf: string): { text: string; due: boolean } | null {
+  if (!p.next_planting) return null
+  const due = p.next_planting.start_date <= asOf
+  const name = p.next_planting.variety_name ?? 'A planting'
+  return {
+    text: due
+      ? `${name} is ready to go in (planned for ${p.next_planting.start_date})`
+      : `Up next: ${name}, planned for ${p.next_planting.start_date}`,
+    due,
   }
 }
 
@@ -852,6 +870,8 @@ export function ContainerDetailPage() {
                   const isEdgeBottom = planting && y === planting.square_y + planting.square_height - 1
                   const isEdgeLeft   = planting && x === planting.square_x
                   const isEdgeRight  = planting && x === planting.square_x + planting.square_width - 1
+                  // Only badge a multi-square planting once, at its top-right corner
+                  const nextUp = planting && isEdgeTop && isEdgeRight ? nextUpInfo(planting, selectedDate) : null
 
                   return (
                     <div
@@ -879,10 +899,16 @@ export function ContainerDetailPage() {
                       onContextMenu={(e) => handleSquareRightClick(e, x, y)}
                       title={
                         planting
-                          ? `${planting.variety_name} · ${statusLabel(planting.status)}`
+                          ? `${planting.variety_name} · ${statusLabel(planting.status)}${planting.overdue ? ' (past estimated end)' : ''}`
+                            + (nextUp ? `\n${nextUp.text}` : '')
                           : `${ROW_LABELS[y]}${x + 1}${support ? ` — ${support.support_type}` : ' — empty'}`
                       }
                     >
+                      {nextUp && (
+                        <span className={`next-up-badge ${nextUp.due ? 'due' : ''}`} aria-label={nextUp.text}>
+                          🌱
+                        </span>
+                      )}
                       {planting && planting.category_icon_svg && (
                         <span
                           className="square-category-icon"
@@ -917,6 +943,7 @@ export function ContainerDetailPage() {
             <span className="legend-item"><span className="legend-swatch not-started" /> Planned</span>
             <span className="legend-item"><span className="legend-swatch in-progress" /> Growing</span>
             <span className="legend-item"><span className="legend-swatch complete" /> Complete</span>
+            <span className="legend-item"><span className="next-up-badge legend">🌱</span> Next planting waiting</span>
           </div>
         </div>
       )}
@@ -935,6 +962,7 @@ export function ContainerDetailPage() {
                 <div className="tower-pockets">
                   {Array.from({ length: container.pockets_per_level || 0 }).map((_, pocket) => {
                     const planting = getPlantingAtLevel(level, pocket)
+                    const nextUp = planting ? nextUpInfo(planting, selectedDate) : null
                     return (
                       <div
                         key={pocket}
@@ -954,8 +982,17 @@ export function ContainerDetailPage() {
                             setSquareChooser({ x: pocket, y: 0, towerLevel: level })
                           }
                         }}
-                        title={planting ? planting.variety_name || '' : `Pocket ${pocket + 1}`}
+                        title={
+                          planting
+                            ? (planting.variety_name || '') + (nextUp ? `\n${nextUp.text}` : '')
+                            : `Pocket ${pocket + 1}`
+                        }
                       >
+                        {nextUp && (
+                          <span className={`next-up-badge ${nextUp.due ? 'due' : ''}`} aria-label={nextUp.text}>
+                            🌱
+                          </span>
+                        )}
                         {planting ? (
                           <span className="pocket-variety">{planting.variety_name?.substring(0, 3)}</span>
                         ) : (
@@ -1460,6 +1497,20 @@ export function ContainerDetailPage() {
                       <span className="detail-label">Dates</span>
                       <span className="detail-value">{selectedPlanting.start_date} → {selectedPlanting.end_date}</span>
                     </div>
+                    {selectedPlanting.overdue && (() => {
+                      const nextUp = nextUpInfo(selectedPlanting, selectedDate)
+                      return (
+                        <div className={`next-up-note ${nextUp?.due ? 'due' : ''}`}>
+                          Past its estimated end date, so it stays in the ground until you mark it done.
+                          {nextUp && (
+                            <>
+                              <br />
+                              <span aria-hidden="true">🌱</span> {nextUp.text}.
+                            </>
+                          )}
+                        </div>
+                      )
+                    })()}
                     {selectedPlanting.seed_start_date && (
                       <div className="detail-item">
                         <span className="detail-label">Seed Started</span>
@@ -1511,8 +1562,17 @@ export function ContainerDetailPage() {
                       🌾 Log Harvest
                     </Link>
                   )}
+                  {selectedPlanting.overdue && (
+                    <Link
+                      to={`/plantings/${selectedPlanting.id}?remove=1`}
+                      className="btn btn-outline-dark"
+                      onClick={() => setSelectedPlanting(null)}
+                    >
+                      ✅ Mark Done
+                    </Link>
+                  )}
                   <button
-                    className="btn btn-outline"
+                    className="btn btn-outline-dark"
                     title="Plan a successor crop for this square"
                     onClick={() => {
                       const p = selectedPlanting

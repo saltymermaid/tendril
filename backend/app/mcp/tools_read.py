@@ -28,6 +28,7 @@ from app.models.yard import Yard, YardObject
 from app.services.harvest_forecast import get_harvest_forecast as _get_harvest_forecast
 from app.services.lifecycle import compute_lifecycle_phase
 from app.services.recommendations import get_recommendations as _get_recommendations
+from app.services.succession import is_overdue, next_plantings_for_overdue
 
 DEFAULT_LIST_LIMIT = 100
 
@@ -365,7 +366,7 @@ async def get_yard(yard_id: int) -> dict:
         return {"id": yard.id, "name": yard.name, "width": yard.width, "height": yard.height, "objects": objects}
 
 
-def _planting_dict(p: Planting) -> dict:
+def _planting_dict(p: Planting, next_planting: Planting | None = None) -> dict:
     lifecycle = None
     if p.variety:
         phase = compute_lifecycle_phase(
@@ -404,6 +405,14 @@ def _planting_dict(p: Planting) -> dict:
         "removal_reason": p.removal_reason,
         "start_id": p.start_id,
         "lifecycle": lifecycle,
+        "overdue": is_overdue(p, date.today()),
+        "next_planting": {
+            "id": next_planting.id,
+            "variety_name": next_planting.variety.name if next_planting.variety else None,
+            "start_date": _iso(next_planting.start_date),
+        }
+        if next_planting
+        else None,
     }
 
 
@@ -416,8 +425,12 @@ async def list_plantings(
     limit: int = DEFAULT_LIST_LIMIT,
 ) -> list[dict]:
     """List plantings, optionally filtered by container, status (not_started/in_progress/complete),
-    or a date range (plantings overlapping [start_date, end_date] are returned).
-    Defaults to the 100 most recent — pass filters to narrow down large gardens."""
+    or a date range (plantings in the ground at any point in [start_date, end_date] are returned).
+    Defaults to the 100 most recent — pass filters to narrow down large gardens.
+
+    end_date is only an estimate: an in_progress planting stays in the ground, holding its
+    squares, until it's completed. `overdue` is true once it's past end_date, and
+    `next_planting` then names the planned planting waiting for its squares, if any."""
     async with async_session() as db:
         user = await get_mcp_user(db)
         stmt = (
@@ -432,17 +445,22 @@ async def list_plantings(
         if status is not None:
             stmt = stmt.where(Planting.status == status)
         if start_date is not None:
-            stmt = stmt.where(Planting.end_date >= start_date)
+            # in_progress plantings are still in the ground past their estimated end_date
+            stmt = stmt.where(or_(Planting.end_date >= start_date, Planting.status == "in_progress"))
         if end_date is not None:
             stmt = stmt.where(Planting.start_date <= end_date)
 
         result = await db.execute(stmt)
-        return [_planting_dict(p) for p in result.scalars().all()]
+        plantings = result.scalars().all()
+        nexts = await next_plantings_for_overdue(db, plantings, date.today())
+        return [_planting_dict(p, nexts.get(p.id)) for p in plantings]
 
 
 @mcp_server.tool()
 async def get_planting(planting_id: int) -> dict:
-    """Get a single planting's detail, including its computed lifecycle phase."""
+    """Get a single planting's detail, including its computed lifecycle phase, whether it's
+    overdue (still in the ground past its estimated end_date), and the planned planting
+    waiting for its squares if so."""
     async with async_session() as db:
         user = await get_mcp_user(db)
         stmt = (
@@ -454,7 +472,8 @@ async def get_planting(planting_id: int) -> dict:
         planting = result.scalar_one_or_none()
         if not planting:
             raise ToolError(f"Planting {planting_id} not found")
-        return _planting_dict(planting)
+        nexts = await next_plantings_for_overdue(db, [planting], date.today())
+        return _planting_dict(planting, nexts.get(planting.id))
 
 
 @mcp_server.tool()
@@ -529,7 +548,8 @@ async def get_recommendations(
     tower_level: int | None = None,
 ) -> dict:
     """'What can I plant here?' — recommend varieties for a specific square on a given date
-    (defaults to today), scored by season fit, size fit, harvest-deadline fit, companion
+    (defaults to today; an in_progress planting counts as still occupying its squares past its
+    estimated end_date until it's completed), scored by season fit, size fit, harvest-deadline fit, companion
     planting, and support-structure match. For towers, pass tower_level (0-based) with
     square_x as the pocket and square_y=0."""
     async with async_session() as db:

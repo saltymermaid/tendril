@@ -66,14 +66,13 @@ class Planting(Base):
     def in_ground_on(cls, on: date) -> ColumnElement[bool]:
         """SQL filter for plantings occupying their squares on `on`.
 
-        end_date is only an estimate, so a planting that's still in_progress past it stays
-        in the ground until it's marked complete — through today, not into the future, so
-        views of upcoming dates still show the plan.
+        end_date is only an estimate, so a planting that's still in_progress stays in the
+        ground — on any date after it went in — until it's marked complete.
         """
-        not_ended = cls.end_date > on
-        if on <= date.today():
-            not_ended = or_(not_ended, cls.status == "in_progress")
-        return and_(cls.start_date <= on, not_ended)
+        return and_(
+            cls.start_date <= on,
+            or_(cls.end_date > on, cls.status == "in_progress"),
+        )
 
     def __repr__(self) -> str:
         return f"<Planting(id={self.id}, variety_id={self.variety_id}, status='{self.status}')>"

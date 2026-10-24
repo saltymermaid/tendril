@@ -63,6 +63,14 @@ class LifecyclePhaseResponse(BaseModel):
     progress_percent: float
 
 
+class NextPlantingResponse(BaseModel):
+    """A planned planting waiting for an overdue planting's squares."""
+
+    id: int
+    variety_name: str | None = None
+    start_date: date
+
+
 class PlantingResponse(BaseModel):
     id: int
     user_id: int
@@ -91,5 +99,10 @@ class PlantingResponse(BaseModel):
 
     # Lifecycle phase (computed)
     lifecycle: LifecyclePhaseResponse | None = None
+
+    # Still in_progress on/after its estimated end_date — it stays in the ground until completed
+    overdue: bool = False
+    # The earliest planned planting waiting on this overdue planting's squares
+    next_planting: NextPlantingResponse | None = None
 
     model_config = {"from_attributes": True}

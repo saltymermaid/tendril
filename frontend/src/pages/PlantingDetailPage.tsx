@@ -1,6 +1,6 @@
 import { apiFetch } from "../lib/api"
 import { useEffect, useState, useCallback } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 
 interface LifecyclePhase {
   phase: string
@@ -91,6 +91,10 @@ const HARVEST_UNITS = [
 export function PlantingDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  // ?remove=1 (from a bed's "Mark Done") opens the removal dialog straight away,
+  // and goes back to the bed once it's done
+  const [searchParams] = useSearchParams()
+  const openRemove = searchParams.get('remove') === '1'
   const [planting, setPlanting] = useState<PlantingDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -117,6 +121,10 @@ export function PlantingDetailPage() {
   useEffect(() => {
     if (id) fetchPlanting()
   }, [id])
+
+  useEffect(() => {
+    if (openRemove && planting?.status === 'in_progress') setShowRemoveModal(true)
+  }, [openRemove, planting?.id])
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -204,7 +212,12 @@ export function PlantingDetailPage() {
         const data = await res.json()
         throw new Error(data.detail || 'Failed to complete')
       }
-      setPlanting(await res.json())
+      const completed = await res.json()
+      if (openRemove) {
+        navigate(`/containers/${completed.container_id}`)
+        return
+      }
+      setPlanting(completed)
       setShowRemoveModal(false)
       setRemovalReason('')
     } catch (err: unknown) {

@@ -2267,6 +2267,53 @@ select.form-input {
   opacity: 0.5;
 }
 
+/* "Next planting waiting" badge — an overdue planting with a planned successor behind it */
+.next-up-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-green-400);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  z-index: 1;
+}
+
+/* The planned start date has arrived — time to pull the old plant */
+.next-up-badge.due {
+  background: var(--color-warning);
+  border-color: var(--color-warning);
+}
+
+.next-up-badge.legend {
+  position: static;
+}
+
+.tower-pocket {
+  position: relative;
+}
+
+.next-up-note {
+  grid-column: 1 / -1;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--color-green-400);
+  background: var(--color-green-tint);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.next-up-note.due {
+  border-left-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+}
+
 /* Grid header row */
 .grid-header-row {
   display: flex;
@@ -2419,6 +2466,7 @@ select.form-input {
 
 .modal-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-2);
   margin-top: var(--space-4);

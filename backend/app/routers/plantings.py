@@ -21,11 +21,13 @@ from app.schemas.planting import (
     ActivatePlanting,
     CompletePlanting,
     LifecyclePhaseResponse,
+    NextPlantingResponse,
     PlantingCreate,
     PlantingResponse,
     PlantingUpdate,
 )
 from app.services.lifecycle import compute_lifecycle_phase, _avg_days
+from app.services.succession import is_overdue, next_plantings_for_overdue
 
 router = APIRouter(prefix="/api/plantings", tags=["plantings"])
 
@@ -54,8 +56,14 @@ def _compute_lifecycle(p: Planting) -> LifecyclePhaseResponse | None:
     )
 
 
-def _planting_to_response(p: Planting) -> PlantingResponse:
-    """Convert a Planting ORM object to PlantingResponse with joined fields."""
+def _planting_to_response(
+    p: Planting, as_of: date | None = None, next_planting: Planting | None = None
+) -> PlantingResponse:
+    """Convert a Planting ORM object to PlantingResponse with joined fields.
+
+    `overdue` is judged as of `as_of` (default today); `next_planting` is whatever's
+    waiting on this planting's squares, from next_plantings_for_overdue.
+    """
     variety_name = None
     category_name = None
     category_color = None
@@ -96,6 +104,14 @@ def _planting_to_response(p: Planting) -> PlantingResponse:
         category_icon_svg=category_icon_svg,
         container_name=container_name,
         lifecycle=_compute_lifecycle(p),
+        overdue=is_overdue(p, as_of or date.today()),
+        next_planting=NextPlantingResponse(
+            id=next_planting.id,
+            variety_name=next_planting.variety.name if next_planting.variety else None,
+            start_date=next_planting.start_date,
+        )
+        if next_planting
+        else None,
     )
 
 
@@ -598,7 +614,9 @@ async def get_container_plantings(
 
     result = await db.execute(query)
     plantings = result.scalars().all()
-    return [_planting_to_response(p) for p in plantings]
+    on = as_of or date.today()
+    nexts = await next_plantings_for_overdue(db, plantings, on)
+    return [_planting_to_response(p, on, nexts.get(p.id)) for p in plantings]
 
 
 # --- Get planting detail ---
