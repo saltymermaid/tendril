@@ -3,7 +3,7 @@
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -60,6 +60,19 @@ async def containers_overview(
     planting_result = await db.execute(planting_stmt)
     all_plantings = planting_result.scalars().all()
 
+    # Count planned (not yet in the ground) plantings per container, including
+    # ones scheduled after the view date — those aren't in all_plantings.
+    planned_result = await db.execute(
+        select(Planting.container_id, func.count())
+        .where(
+            Planting.user_id == user.id,
+            Planting.status == "not_started",
+            Planting.end_date > view_date,
+        )
+        .group_by(Planting.container_id)
+    )
+    planned_by_container = dict(planned_result.all())
+
     # Group plantings by container
     plantings_by_container: dict[int, list] = {}
     for p in all_plantings:
@@ -114,6 +127,8 @@ async def containers_overview(
             "pockets_per_level": c.pockets_per_level,
             "total_slots": total_slots,
             "planted_slots": len(planted_slots),
+            "growing_count": sum(1 for p in container_plantings if p.status == "in_progress"),
+            "planned_count": planned_by_container.get(c.id, 0),
             "plantings": compact_plantings,
         })
 
