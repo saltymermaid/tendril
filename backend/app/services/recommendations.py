@@ -166,8 +166,7 @@ async def get_recommendations(
         .where(
             Planting.container_id == container_id,
             Planting.user_id == user_id,
-            Planting.start_date <= target_date,
-            Planting.end_date > target_date,
+            Planting.in_ground_on(target_date),
         )
     )
     active_plantings = planting_result.scalars().all()

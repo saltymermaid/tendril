@@ -53,8 +53,7 @@ async def containers_overview(
         )
         .where(
             Planting.user_id == user.id,
-            Planting.start_date <= view_date,
-            Planting.end_date > view_date,
+            Planting.in_ground_on(view_date),
         )
     )
     planting_result = await db.execute(planting_stmt)
