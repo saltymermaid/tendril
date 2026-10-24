@@ -25,6 +25,8 @@ interface ContainerOverview {
   type: string
   total_slots: number
   planted_slots: number
+  growing_count: number
+  planned_count: number
   plantings: { id: number; variety_name: string; status: string }[]
 }
 
@@ -90,10 +92,8 @@ export function DashboardPage() {
 
   // Compute stats
   const totalContainers = containers.length
-  const totalPlantings = containers.reduce(
-    (sum, c) => sum + c.plantings.filter((p) => p.status === 'active').length,
-    0
-  )
+  const totalGrowing = containers.reduce((sum, c) => sum + c.growing_count, 0)
+  const totalPlanned = containers.reduce((sum, c) => sum + c.planned_count, 0)
   const totalSlots = containers.reduce((sum, c) => sum + c.total_slots, 0)
   const plantedSlots = containers.reduce((sum, c) => sum + c.planted_slots, 0)
   const overdueTasks = tasks.filter((t) => isOverdue(t.due_date))
@@ -139,8 +139,9 @@ export function DashboardPage() {
           <div className="stat-sub">{plantedSlots}/{totalSlots} slots used</div>
         </button>
         <button className="stat-card stat-card-btn" onClick={() => navigate('/timeline')}>
-          <div className="stat-value">{totalPlantings}</div>
-          <div className="stat-label">Active Plantings</div>
+          <div className="stat-value">{totalGrowing}</div>
+          <div className="stat-label">Growing</div>
+          <div className="stat-sub">{totalPlanned} planned</div>
         </button>
         <button className="stat-card stat-card-btn" onClick={() => navigate('/tasks')}>
           <div className="stat-value">{tasks.length}</div>
@@ -270,7 +271,7 @@ export function DashboardPage() {
                         <div className="dashboard-container-name">{c.name}</div>
                         <div className="dashboard-container-meta">
                           {c.planted_slots}/{c.total_slots} slots ·{' '}
-                          {c.plantings.filter((p) => p.status === 'active').length} active
+                          {c.growing_count} growing · {c.planned_count} planned
                         </div>
                       </div>
                     </div>
